@@ -19,6 +19,8 @@
 
 #include <android/rect.h>
 
+#include <system/window.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,9 +33,6 @@ enum {
     WINDOW_FORMAT_RGBX_8888          = 2,
     WINDOW_FORMAT_RGB_565            = 4,
 };
-
-struct ANativeWindow;
-typedef struct ANativeWindow ANativeWindow;
 
 typedef struct ANativeWindow_Buffer {
     // The number of pixels that are show horizontally.
