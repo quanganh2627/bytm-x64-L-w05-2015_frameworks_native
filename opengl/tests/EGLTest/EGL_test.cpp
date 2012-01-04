@@ -53,6 +53,13 @@ protected:
     }
 };
 
+TEST_F(EGLTest, EGLGetConfigsWithNullNumConfigs) {
+    EGLBoolean success;
+    success = eglGetConfigs(mEglDisplay, NULL, 0, NULL);
+    ASSERT_EQ(EGL_FALSE, success);
+    ASSERT_EQ(EGL_BAD_PARAMETER, eglGetError());
+}
+
 TEST_F(EGLTest, DISABLED_EGLConfigEightBitFirst) {
 
     EGLint numConfigs;
