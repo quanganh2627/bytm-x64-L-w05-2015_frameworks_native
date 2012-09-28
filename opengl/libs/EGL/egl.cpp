@@ -133,7 +133,7 @@ void initEglDebugLevel() {
         if (file) {
             char cmdline[256] = {};
             if (fgets(cmdline, sizeof(cmdline) - 1, file)) {
-                if (!strncmp(value, cmdline, strlen(value))) {
+                if (!strncmp(value, cmdline, PROPERTY_VALUE_MAX)) {
                     // set EGL debug if the "debug.egl.debug_proc" property
                     // matches the prefix of this application's command line
                     propertyLevel = 1;
