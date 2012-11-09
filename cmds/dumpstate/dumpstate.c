@@ -87,6 +87,7 @@ static void dumpstate() {
     dump_file("BUDDYINFO", "/proc/buddyinfo");
     dump_file("FRAGMENTATION INFO", "/d/extfrag/unusable_index");
 
+    dump_file("PMUSTATES", "/sys/kernel/debug/mid_pmu_states");
 
     dump_file("KERNEL WAKELOCKS", "/proc/wakelocks");
     dump_file("KERNEL WAKE SOURCES", "/d/wakeup_sources");
