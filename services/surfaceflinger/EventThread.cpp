@@ -38,6 +38,8 @@ namespace android {
 
 EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
     : mFlinger(flinger),
+      mLastVSyncTimestamp(0),
+      mLastVSyncDisplayType(-1),
       mUseSoftwareVSync(false),
       mDebugVsyncEnabled(false) {
 
@@ -177,6 +179,8 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 {
     Mutex::Autolock _l(mLock);
     Vector< sp<EventThread::Connection> > signalConnections;
+    nsecs_t currentVSyncTimestamp = 0;
+    int     currentVSyncDisplayType = -1;
 
     do {
         bool eventPending = false;
@@ -188,6 +192,8 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
             timestamp = mVSyncEvent[i].header.timestamp;
             if (timestamp) {
                 // we have a vsync event to dispatch
+                currentVSyncTimestamp = timestamp;
+                currentVSyncDisplayType = i;
                 *event = mVSyncEvent[i];
                 mVSyncEvent[i].header.timestamp = 0;
                 vsyncCount = mVSyncEvent[i].vsync.count;
@@ -299,6 +305,9 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
         }
     } while (signalConnections.isEmpty());
 
+    mLastVSyncTimestamp = currentVSyncTimestamp;
+    mLastVSyncDisplayType = currentVSyncDisplayType;
+
     // here we're guaranteed to have a timestamp and some connections to signal
     // (The connections might have dropped out of mDisplayEventConnections
     // while we were asleep, but we'll still have strong references to them.)
@@ -329,6 +338,8 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
     result.appendFormat("  numListeners=%u,\n  events-delivered: %u\n",
             mDisplayEventConnections.size(),
             mVSyncEvent[HWC_DISPLAY_PRIMARY].vsync.count);
+    result.appendFormat("  VSYNC came %lldus ago, display type is %d.\n",
+            ((systemTime(CLOCK_MONOTONIC) - mLastVSyncTimestamp)/1000), mLastVSyncDisplayType);
     for (size_t i=0 ; i<mDisplayEventConnections.size() ; i++) {
         sp<Connection> connection =
                 mDisplayEventConnections.itemAt(i).promote();
