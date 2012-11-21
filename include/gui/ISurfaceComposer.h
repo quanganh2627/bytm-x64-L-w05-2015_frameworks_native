@@ -109,6 +109,7 @@ public:
     /* returns information about a display
      * intended to be used to get information about built-in displays */
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info) = 0;
+    virtual bool isAnimationPermitted() = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -130,6 +131,7 @@ public:
         BLANK,
         UNBLANK,
         GET_DISPLAY_INFO,
+        IS_ANIMATION_PERMITTED,
         CONNECT_DISPLAY,
     };
 

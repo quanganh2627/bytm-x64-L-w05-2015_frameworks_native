@@ -101,7 +101,8 @@ SurfaceFlinger::SurfaceFlinger()
         mLastSwapBufferTime(0),
         mDebugInTransaction(0),
         mLastTransactionTime(0),
-        mBootFinished(false)
+        mBootFinished(false),
+        mAnimFlag(true)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -1533,6 +1534,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
     const Transform& tr = hw->getTransform();
     if (cur != end) {
         // we're using h/w composer
+        bool needDisableAnimation = false;
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<LayerBase>& layer(layers[i]);
             const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
@@ -1547,6 +1549,8 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
+                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
+                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
@@ -1561,6 +1565,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                     }
                 }
             }
+            mAnimFlag = needDisableAnimation ? false : true;
             layer->setAcquireFence(hw, *cur);
         }
     } else {
@@ -2582,9 +2587,11 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(uint32_t layerStack,
     glLoadIdentity();
     const Vector< sp<LayerBase> >& layers(hw->getVisibleLayersSortedByZ());
     const size_t count = layers.size();
-    for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
-        layer->draw(hw);
+    if (mAnimFlag) {
+        for (size_t i=0 ; i<count ; ++i) {
+            const sp<LayerBase>& layer(layers[i]);
+            layer->draw(hw);
+        }
     }
 
     hw->compositionComplete();
@@ -2782,6 +2789,10 @@ status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display,
         res = static_cast<MessageCaptureScreen*>( msg.get() )->getResult();
     }
     return res;
+}
+
+bool SurfaceFlinger::isAnimationPermitted() {
+    return mAnimFlag;
 }
 
 // ---------------------------------------------------------------------------

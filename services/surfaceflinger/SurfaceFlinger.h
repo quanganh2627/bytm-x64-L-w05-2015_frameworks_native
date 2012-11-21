@@ -206,6 +206,7 @@ private:
     // called when screen is turning back on
     virtual void unblank(const sp<IBinder>& display);
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
+    virtual bool isAnimationPermitted();
 
     /* ------------------------------------------------------------------------
      * DeathRecipient interface
@@ -444,6 +445,7 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
+    bool mAnimFlag;
 
     // these are thread safe
     mutable MessageQueue mEventQueue;
