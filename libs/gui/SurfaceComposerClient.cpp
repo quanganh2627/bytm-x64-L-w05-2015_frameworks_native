@@ -608,6 +608,10 @@ void SurfaceComposerClient::unblankDisplay(const sp<IBinder>& token) {
     ComposerService::getComposerService()->unblank(token);
 }
 
+bool SurfaceComposerClient::isAnimationPermitted()
+{
+    return ComposerService::getComposerService()->isAnimationPermitted();
+}
 // ----------------------------------------------------------------------------
 
 status_t ScreenshotClient::capture(

@@ -102,7 +102,8 @@ SurfaceFlinger::SurfaceFlinger()
         mLastSwapBufferTime(0),
         mDebugInTransaction(0),
         mLastTransactionTime(0),
-        mBootFinished(false)
+        mBootFinished(false),
+        mAnimFlag(true)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -1603,6 +1604,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
     const Transform& tr = hw->getTransform();
     if (cur != end) {
         // we're using h/w composer
+        bool needDisableAnimation = false;
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<Layer>& layer(layers[i]);
             const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
@@ -1617,6 +1619,8 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
+                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
+                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
@@ -1631,6 +1635,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                     }
                 }
             }
+            mAnimFlag = needDisableAnimation ? false : true;
             layer->setAcquireFence(hw, *cur);
         }
     } else {
@@ -2960,6 +2965,10 @@ status_t SurfaceFlinger::captureScreenImplCpuConsumerLocked(
     DisplayDevice::setViewportAndProjection(hw);
 
     return result;
+}
+
+bool SurfaceFlinger::isAnimationPermitted() {
+    return mAnimFlag;
 }
 
 // ---------------------------------------------------------------------------

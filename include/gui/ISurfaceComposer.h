@@ -117,6 +117,8 @@ public:
             uint32_t reqWidth, uint32_t reqHeight,
             uint32_t minLayerZ, uint32_t maxLayerZ,
             bool isCpuConsumer) = 0;
+
+    virtual bool isAnimationPermitted() = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -137,6 +139,7 @@ public:
         BLANK,
         UNBLANK,
         GET_DISPLAY_INFO,
+        IS_ANIMATION_PERMITTED,
         CONNECT_DISPLAY,
         CAPTURE_SCREEN,
     };
