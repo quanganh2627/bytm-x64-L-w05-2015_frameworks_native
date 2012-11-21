@@ -24,6 +24,7 @@
 #include <gui/BitTube.h>
 #include <gui/IDisplayEventConnection.h>
 #include <gui/DisplayEventReceiver.h>
+#include <cutils/properties.h>
 
 #include <utils/Errors.h>
 #include <utils/String8.h>
@@ -40,6 +41,7 @@ EventThread::EventThread(const sp<VSyncSource>& src)
     : mVSyncSource(src),
       mUseSoftwareVSync(false),
       mVsyncEnabled(false),
+      mVsyncDisabled(false),
       mDebugVsyncEnabled(false) {
 
     for (int32_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
@@ -51,6 +53,9 @@ EventThread::EventThread(const sp<VSyncSource>& src)
 }
 
 void EventThread::onFirstRef() {
+    char vsyncValue[92] = {'\0'};
+    if (property_get("vsync.disable", vsyncValue, NULL))
+        mVsyncDisabled = atoi(vsyncValue);
     run("EventThread", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
 }
 
@@ -89,8 +94,17 @@ void EventThread::requestNextVsync(
     Mutex::Autolock _l(mLock);
     if (connection->count < 0) {
         connection->count = 0;
+        if (mVsyncDisabled) {
+            // FIXME: how do we decide which display id the fake
+            // vsync came from ?
+            mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
+            mVSyncEvent[0].header.id = HWC_DISPLAY_PRIMARY;
+            mVSyncEvent[0].header.timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+            mVSyncEvent[0].vsync.count++;
+        }
         mCondition.broadcast();
     }
+
 }
 
 void EventThread::onScreenReleased() {
