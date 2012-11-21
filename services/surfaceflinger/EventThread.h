@@ -106,6 +106,8 @@ private:
     Vector< DisplayEventReceiver::Event > mPendingEvents;
     DisplayEventReceiver::Event mVSyncEvent[HWC_DISPLAY_TYPES_SUPPORTED];
     bool mUseSoftwareVSync;
+    nsecs_t mLastVSyncTimestamp;
+    int mLastVSyncDisplayType;
 
     // for debugging
     bool mDebugVsyncEnabled;
