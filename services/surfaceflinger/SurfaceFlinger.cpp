@@ -150,6 +150,7 @@ SurfaceFlinger::SurfaceFlinger()
         mDebugInTransaction(0),
         mLastTransactionTime(0),
         mBootFinished(false),
+        mAnimFlag(true),
         mPrimaryHWVsyncEnabled(false),
         mHWVsyncAvailable(false),
         mDaltonize(false),
@@ -1779,6 +1780,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
     const Transform& tr = hw->getTransform();
     if (cur != end) {
         // we're using h/w composer
+        bool needDisableAnimation = false;
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<Layer>& layer(layers[i]);
             const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
@@ -1794,6 +1796,8 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
+                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
+                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
@@ -1809,6 +1813,9 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                 }
             }
             layer->setAcquireFence(hw, *cur);
+        }
+        if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+            mAnimFlag = needDisableAnimation ? false : true;
         }
     } else {
         // we're not using h/w composer
@@ -2972,15 +2979,17 @@ void SurfaceFlinger::renderScreenImplLocked(
 
     const LayerVector& layers( mDrawingState.layersSortedByZ );
     const size_t count = layers.size();
-    for (size_t i=0 ; i<count ; ++i) {
-        const sp<Layer>& layer(layers[i]);
-        const Layer::State& state(layer->getDrawingState());
-        if (state.layerStack == hw->getLayerStack()) {
-            if (state.z >= minLayerZ && state.z <= maxLayerZ) {
-                if (layer->isVisible()) {
-                    if (filtering) layer->setFiltering(true);
-                    layer->draw(hw);
-                    if (filtering) layer->setFiltering(false);
+    if (mAnimFlag) {
+        for (size_t i=0 ; i<count ; ++i) {
+            const sp<Layer>& layer(layers[i]);
+            const Layer::State& state(layer->getDrawingState());
+            if (state.layerStack == hw->getLayerStack()) {
+                if (state.z >= minLayerZ && state.z <= maxLayerZ) {
+                    if (layer->isVisible()) {
+                        if (filtering) layer->setFiltering(true);
+                        layer->draw(hw);
+                        if (filtering) layer->setFiltering(false);
+                    }
                 }
             }
         }
@@ -3127,6 +3136,10 @@ void SurfaceFlinger::checkScreenshot(size_t w, size_t s, size_t h, void const* v
                             layer->isVisible(), state.flags, state.alpha);
         }
     }
+}
+
+bool SurfaceFlinger::isAnimationPermitted() {
+    return mAnimFlag;
 }
 
 // ---------------------------------------------------------------------------
