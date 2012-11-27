@@ -569,6 +569,8 @@ status_t HWComposer::prepare() {
         if (!disp.connected && disp.list != NULL) {
             ALOGW("WARNING: disp %d: connected, non-null list, layers=%d",
                   i, disp.list->numHwLayers);
+            free(disp.list);
+            disp.list = NULL;
         }
         mLists[i] = disp.list;
         if (mLists[i]) {
