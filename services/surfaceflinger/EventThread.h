@@ -50,6 +50,7 @@ class EventThread : public Thread {
         // count == 0 : one-shot event that has not fired
         // count ==-1 : one-shot event that fired this round / disabled
         int32_t count;
+        nsecs_t mLastRequestTimestamp;
 
     private:
         virtual ~Connection();
