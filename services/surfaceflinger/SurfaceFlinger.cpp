@@ -88,6 +88,7 @@ SurfaceFlinger::SurfaceFlinger()
         mTransactionFlags(0),
         mTransactionPending(false),
         mAnimTransactionPending(false),
+        mDisplayScaleState(0),
         mLayersRemoved(false),
         mRepaintEverything(0),
         mBootTime(systemTime()),
@@ -1143,10 +1144,14 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         }
                         if ((state.orientation != draw[i].orientation)
                                 || (state.viewport != draw[i].viewport)
-                                || (state.frame != draw[i].frame))
+                                || (state.frame != draw[i].frame)
+                                || (state.scale != draw[i].scale))
                         {
+                            Rect frame = state.frame;
+                            Rect viewport = state.viewport;
+                            handleDisplayScaling(state, viewport, frame);
                             disp->setProjection(state.orientation,
-                                    state.viewport, state.frame);
+                                    viewport, frame);
                         }
                     }
                 }
@@ -1318,6 +1323,92 @@ void SurfaceFlinger::commitTransaction()
     mTransactionPending = false;
     mAnimTransactionPending = false;
     mTransactionCV.broadcast();
+}
+
+void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
+        Rect& viewport, Rect& frame)
+{
+    if (state.type == DisplayDevice::DISPLAY_EXTERNAL) {
+        uint32_t width;
+        uint32_t height;
+        HWComposer& hwc(getHwComposer());
+
+        if (!hwc.isConnected(state.type))
+            return;
+
+        width = hwc.getWidth(state.type);
+        height = hwc.getHeight(state.type);
+
+        switch (state.scaleMode) {
+        case DisplayState::eDisplayScaleFullscreen:
+            frame.left = frame.top = 0;
+            frame.right = width;
+            frame.bottom = height;
+            break;
+        case DisplayState::eDisplayScaleCenter:
+        {
+            int viewWidth;
+            int viewHeight;
+            bool isRot90_270;
+
+            isRot90_270 = (state.orientation == DisplayState::eOrientation90 ||
+                 state.orientation == DisplayState::eOrientation270);
+            if (isRot90_270) {
+                viewWidth = viewport.bottom - viewport.top;
+                viewHeight = viewport.right - viewport.left;
+            } else {
+                viewWidth = viewport.right - viewport.left;
+                viewHeight = viewport.bottom - viewport.top;
+            }
+
+            if (width < viewWidth) {
+                frame.left = 0;
+                frame.right = width;
+                if (isRot90_270) {
+                    viewport.top = 0;
+                    viewport.bottom = width;
+                } else {
+                    viewport.left = 0;
+                    viewport.right = width;
+                }
+            } else {
+                frame.left = (width - viewWidth) / 2;
+                frame.right = (width + viewWidth) / 2;
+            }
+
+            if (height < viewHeight) {
+                frame.top = 0;
+                frame.bottom = height;
+                if (isRot90_270) {
+                    viewport.left = 0;
+                    viewport.right = height;
+                } else {
+                    viewport.top = 0;
+                    viewport.bottom = height;
+                }
+            } else {
+                frame.top = (height - viewHeight) / 2;
+                frame.bottom = (height + viewHeight) / 2;
+            }
+            break;
+        }
+        case DisplayState::eDisplayScaleAspect:
+        case DisplayState::eDisplayScaleNone:
+        default:
+            break;
+        }
+
+        if (state.scaleStepX) {
+            int frameWidth = frame.right - frame.left;
+            frame.left += state.scaleStepX * frameWidth / 100;
+            frame.right -= state.scaleStepX * frameWidth / 100;
+        }
+        if (state.scaleStepY) {
+            int frameHeight = frame.bottom - frame.left;
+            frame.top += state.scaleStepY * frameHeight / 100;
+            frame.bottom -= state.scaleStepY * frameHeight / 100;
+        }
+    }
 }
 
 void SurfaceFlinger::computeVisibleRegions(
@@ -1836,6 +1927,13 @@ uint32_t SurfaceFlinger::setDisplayStateLocked(const DisplayState& s)
             if (disp.viewport != s.viewport) {
                 disp.viewport = s.viewport;
                 flags |= eDisplayTransactionNeeded;
+            }
+        }
+        if (what & DisplayState::eDisplayScaleChanged) {
+            if (disp.scale != s.scale) {
+                disp.scale = s.scale;
+                flags |= eDisplayTransactionNeeded;
+                mDisplayScaleState = disp.scale;
             }
         }
     }
@@ -3007,7 +3105,7 @@ SurfaceFlinger::DisplayDeviceState::DisplayDeviceState()
 }
 
 SurfaceFlinger::DisplayDeviceState::DisplayDeviceState(DisplayDevice::DisplayType type)
-    : type(type), layerStack(DisplayDevice::NO_LAYER_STACK), orientation(0) {
+    : type(type), layerStack(DisplayDevice::NO_LAYER_STACK), orientation(0), scale(0) {
     viewport.makeInvalid();
     frame.makeInvalid();
 }

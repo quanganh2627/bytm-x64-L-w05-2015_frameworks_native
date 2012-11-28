@@ -155,6 +155,14 @@ private:
         uint8_t orientation;
         String8 displayName;
         bool isSecure;
+        union {
+            uint32_t scale;
+            struct {
+                uint16_t scaleMode;
+                uint8_t  scaleStepX;
+                uint8_t  scaleStepY;
+            };
+        };
     };
 
     struct State {
@@ -237,6 +245,10 @@ private:
      * if available and compute the dirty region.
      */
     void handlePageFlip();
+
+    // handleDisplayScaling: calculate the scaled frame rect.
+    void handleDisplayScaling(const DisplayDeviceState& state,
+        Rect& viewport, Rect& frame);
 
     /* ------------------------------------------------------------------------
      * Transactions
@@ -408,6 +420,8 @@ private:
     bool mAnimTransactionPending;
     Vector< sp<Layer> > mLayersPendingRemoval;
     SortedVector< wp<IBinder> > mGraphicBufferProducerList;
+    // Last DisplayScaling status
+    uint32_t mDisplayScaleState;
 
     // protected by mStateLock (but we could use another lock)
     bool mLayersRemoved;
