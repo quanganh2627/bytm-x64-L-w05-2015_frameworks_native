@@ -104,7 +104,9 @@ SurfaceFlinger::SurfaceFlinger()
         mDebugInTransaction(0),
         mLastTransactionTime(0),
         mBootFinished(false),
-        mAnimFlag(true)
+        mAnimFlag(true),
+        mMutexLocked(false),
+        mSurfaceFlingerThreadId(0)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -553,6 +555,8 @@ status_t SurfaceFlinger::readyToRun()
 
     // start boot animation
     startBootAnim();
+
+    mSurfaceFlingerThreadId = getThreadId();
 
     return NO_ERROR;
 }
@@ -1039,23 +1043,28 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 {
     ATRACE_CALL();
 
-    Mutex::Autolock _l(mStateLock);
-    const nsecs_t now = systemTime();
-    mDebugInTransaction = now;
+    {
+        // scope for the mutex
+        Mutex::Autolock _l(mStateLock);
+        mMutexLocked = true;
+        const nsecs_t now = systemTime();
+        mDebugInTransaction = now;
 
-    // Here we're guaranteed that some transaction flags are set
-    // so we can call handleTransactionLocked() unconditionally.
-    // We call getTransactionFlags(), which will also clear the flags,
-    // with mStateLock held to guarantee that mCurrentState won't change
-    // until the transaction is committed.
+        // Here we're guaranteed that some transaction flags are set
+        // so we can call handleTransactionLocked() unconditionally.
+        // We call getTransactionFlags(), which will also clear the flags,
+        // with mStateLock held to guarantee that mCurrentState won't change
+        // until the transaction is committed.
 
-    transactionFlags = getTransactionFlags(eTransactionMask);
-    handleTransactionLocked(transactionFlags);
+        transactionFlags = getTransactionFlags(eTransactionMask);
+        handleTransactionLocked(transactionFlags);
 
-    mLastTransactionTime = systemTime() - now;
-    mDebugInTransaction = 0;
-    invalidateHwcGeometry();
-    // here the transaction has been committed
+        mLastTransactionTime = systemTime() - now;
+        mDebugInTransaction = 0;
+        invalidateHwcGeometry();
+        // here the transaction has been committed
+    }
+    mMutexLocked = false;
 }
 
 void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)

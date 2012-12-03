@@ -406,6 +406,9 @@ private:
     void dumpAllLocked(String8& result, char* buffer, size_t SIZE) const;
     bool startDdmConnection();
     static void appendSfConfigString(String8& result);
+    bool alreadyLockedBySurfaceFlingerThread(){
+            return (getThreadId() == mSurfaceFlingerThreadId) && mMutexLocked;
+    };
 
     /* ------------------------------------------------------------------------
      * Attributes
@@ -475,6 +478,9 @@ private:
     mutable Mutex mDestroyedLayerLock;
     Vector<Layer const *> mDestroyedLayers;
 
+   //for work around the dead lock
+   bool                        mMutexLocked;
+   thread_id_t                 mSurfaceFlingerThreadId;
     /* ------------------------------------------------------------------------
      * Feature prototyping
      */
