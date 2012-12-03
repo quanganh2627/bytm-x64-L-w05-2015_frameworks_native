@@ -96,6 +96,9 @@ void EventThread::requestNextVsync(
     if (connection->count < 0) {
         connection->count = 0;
         connection->mLastRequestTimestamp = systemTime(CLOCK_MONOTONIC);
+        if(Connection::s_oldestUnreponsedRequestTimestamp == 0) {
+            Connection::s_oldestUnreponsedRequestTimestamp = connection->mLastRequestTimestamp;
+        }
         if (mVsyncDisabled) {
             // FIXME: how do we decide which display id the fake
             // vsync came from ?
@@ -323,6 +326,14 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
     mLastVSyncTimestamp = currentVSyncTimestamp;
     mLastVSyncDisplayType = currentVSyncDisplayType;
 
+    const nsecs_t VSYNC_WARNING_THRESHOLD = 100000000; //100ms
+    nsecs_t syncResponseinterval = systemTime(CLOCK_MONOTONIC) -
+                                                Connection::s_oldestUnreponsedRequestTimestamp;
+    if( syncResponseinterval > VSYNC_WARNING_THRESHOLD ){
+               ALOGW(" warning! VSYNC take %lld ms to deliever!" ,syncResponseinterval/1000000);
+    }
+    Connection::s_oldestUnreponsedRequestTimestamp = 0;
+
     // here we're guaranteed to have a timestamp and some connections to signal
     // (The connections might have dropped out of mDisplayEventConnections
     // while we were asleep, but we'll still have strong references to them.)
@@ -366,6 +377,7 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
 }
 
 // ---------------------------------------------------------------------------
+nsecs_t EventThread::Connection::s_oldestUnreponsedRequestTimestamp = 0;
 
 EventThread::Connection::Connection(
         const sp<EventThread>& eventThread)
