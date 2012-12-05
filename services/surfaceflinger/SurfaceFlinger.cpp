@@ -106,7 +106,8 @@ SurfaceFlinger::SurfaceFlinger()
         mBootFinished(false),
         mAnimFlag(true),
         mMutexLocked(false),
-        mSurfaceFlingerThreadId(0)
+        mSurfaceFlingerThreadId(0),
+        mBypassComposition(false)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -943,6 +944,16 @@ void SurfaceFlinger::setUpHWComposer() {
                             if (mDebugDisableHWC || mDebugRegion) {
                                 cur->setSkip(true);
                             }
+                            // when rotation really happens on layers, set
+                            // mBypassCompostion back to be false.
+                            if (i==0 && dpy==0 && mBypassComposition) {
+                                const LayerBase::State& s(layer->drawingState());
+                                const uint32_t finalTransform =
+                                                    s.transform.getOrientation();
+                                if (finalTransform & Transform::ROT_INVALID) {
+                                    mBypassComposition = false;
+                                }
+                            }
                         }
                     }
                 }
@@ -980,6 +991,13 @@ void SurfaceFlinger::doComposition() {
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         const sp<DisplayDevice>& hw(mDisplays[dpy]);
+        // Bypass composition on external display when
+        // orientation changed but rotation has not happen
+        // on layers. It is used to optimize user experience
+        // of external display rotation animation.
+        if (dpy == 1 && mBypassComposition)
+            continue;
+
         if (hw->canDraw()) {
             // transform the dirty region into this screen's coordinate space
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
@@ -1159,6 +1177,10 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             Rect frame = state.frame;
                             Rect viewport = state.viewport;
                             handleDisplayScaling(state, viewport, frame);
+                            // set mBypassComposition once orientation change
+                            if (i==0 && (state.orientation != draw[i].orientation)) {
+                                mBypassComposition = true;
+                            }
                             disp->setProjection(state.orientation,
                                     viewport, frame);
                         }
