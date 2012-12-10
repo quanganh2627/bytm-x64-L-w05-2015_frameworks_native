@@ -1767,8 +1767,10 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                     }
                 }
             }
-            mAnimFlag = needDisableAnimation ? false : true;
             layer->setAcquireFence(hw, *cur);
+        }
+        if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+            mAnimFlag = needDisableAnimation ? false : true;
         }
     } else {
         // we're not using h/w composer
@@ -2937,15 +2939,17 @@ void SurfaceFlinger::renderScreenImplLocked(
 
     const LayerVector& layers( mDrawingState.layersSortedByZ );
     const size_t count = layers.size();
-    for (size_t i=0 ; i<count ; ++i) {
-        const sp<Layer>& layer(layers[i]);
-        const Layer::State& state(layer->drawingState());
-        if (state.layerStack == hw->getLayerStack()) {
-            if (state.z >= minLayerZ && state.z <= maxLayerZ) {
-                if (layer->isVisible()) {
-                    if (filtering) layer->setFiltering(true);
-                    layer->draw(hw);
-                    if (filtering) layer->setFiltering(false);
+    if (mAnimFlag) {
+        for (size_t i=0 ; i<count ; ++i) {
+            const sp<Layer>& layer(layers[i]);
+            const Layer::State& state(layer->drawingState());
+            if (state.layerStack == hw->getLayerStack()) {
+                if (state.z >= minLayerZ && state.z <= maxLayerZ) {
+                    if (layer->isVisible()) {
+                        if (filtering) layer->setFiltering(true);
+                        layer->draw(hw);
+                        if (filtering) layer->setFiltering(false);
+                    }
                 }
             }
         }
