@@ -754,6 +754,23 @@ int HWComposer::fbCompositionComplete() {
     }
 }
 
+int HWComposer::setFramecount(int cmd, int count, int x, int y) {
+    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
+       if (mHwc->reserved_proc[1]) {
+            int (*setFramecount)(struct hwc_composer_device_1*, int, int, int, int) =
+                (int (*)(hwc_composer_device_1*, int, int, int, int))mHwc->reserved_proc[1];
+            setFramecount(mHwc, cmd, count, x, y);
+        }
+        return NO_ERROR;
+    }
+
+    if (mFbDev->compositionComplete) {
+        return mFbDev->setFramecount(cmd, count, x, y);
+    } else {
+        return INVALID_OPERATION;
+    }
+}
+
 void HWComposer::fbDump(String8& result) {
     if (mFbDev && mFbDev->common.version >= 1 && mFbDev->dump) {
         const size_t SIZE = 4096;
