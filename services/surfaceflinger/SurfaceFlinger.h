@@ -73,6 +73,11 @@ enum {
     eDisplayTransactionNeeded = 0x04,
     eTransactionMask          = 0x07
 };
+enum {
+    eUpdateCursorDbg,
+    eEnableCursorDbg,
+    eDisableCursorDbg
+};
 
 class SurfaceFlinger : public BinderService<SurfaceFlinger>,
                        public BnSurfaceComposer,
@@ -454,6 +459,11 @@ private:
 
     // don't use a lock for these, we don't care
     int mDebugRegion;
+    int mDebugFrameCountFlag;
+    int mDebugFrameCountIncFlag;
+    int mDebugFrameCount;
+    int mDebugFrameCountXCoordinate;
+    int mDebugFrameCountYCoordinate;
     int mDebugDDMS;
     int mDebugDisableHWC;
     int mDebugDisableTransformHint;

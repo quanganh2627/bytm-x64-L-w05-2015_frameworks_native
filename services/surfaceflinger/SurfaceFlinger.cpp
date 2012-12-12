@@ -95,6 +95,11 @@ SurfaceFlinger::SurfaceFlinger()
         mVisibleRegionsDirty(false),
         mHwWorkListDirty(false),
         mDebugRegion(0),
+        mDebugFrameCountFlag(0),
+        mDebugFrameCountIncFlag(0),
+        mDebugFrameCountXCoordinate(0),
+        mDebugFrameCountYCoordinate(0),
+        mDebugFrameCount(0),
         mDebugDDMS(0),
         mDebugDisableHWC(0),
         mDebugDisableTransformHint(0),
@@ -677,6 +682,8 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
     info->xdpi = xdpi;
     info->ydpi = ydpi;
     info->fps = float(1e9 / hwc.getRefreshPeriod(type));
+    mDebugFrameCountXCoordinate = info->w;
+    mDebugFrameCountYCoordinate = info->h;
 
     // All non-virtual displays are currently considered secure.
     info->secure = true;
@@ -1015,6 +1022,16 @@ void SurfaceFlinger::doComposition() {
         hw->compositionComplete();
     }
     postFramebuffer();
+    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
+    if (CC_UNLIKELY(mDebugFrameCountFlag)) {
+        hw->setFramecount(eUpdateCursorDbg, (mDebugFrameCount%16), 0, 0);
+        if (CC_UNLIKELY(mDebugFrameCountIncFlag))
+            mDebugFrameCount++;
+        if (mDebugFrameCount >= 9999)
+            mDebugFrameCount = 0;
+        ATRACE_INT("compositionDbg", mDebugFrameCount);
+    }
+
 }
 
 void SurfaceFlinger::postFramebuffer()
@@ -2600,6 +2617,7 @@ bool SurfaceFlinger::startDdmConnection()
 status_t SurfaceFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
     switch (code) {
         case CREATE_CONNECTION:
         case SET_TRANSACTION_STATE:
@@ -2691,9 +2709,39 @@ status_t SurfaceFlinger::onTransact(
                 reply->writeInt32(0);
                 reply->writeInt32(mDebugDisableHWC);
                 return NO_ERROR;
+            case 1011:  // SHOW_FRAME_COUNT
+                n = data.readInt32();
+                mDebugFrameCountFlag = n ? n : (mDebugFrameCountFlag ? 0 : 1);
+                mDebugFrameCount = 0;
+                mDebugFrameCountIncFlag = 0;
+                n = data.readInt32();
+                if (n > 0) {
+                   mDebugFrameCountXCoordinate = n;
+                }
+                   n = data.readInt32();
+                if (n > 0) {
+                   mDebugFrameCountYCoordinate = n;
+                }
+                if (mDebugFrameCountFlag) {
+                   hw->setFramecount(eEnableCursorDbg, 0,
+                   mDebugFrameCountXCoordinate, mDebugFrameCountYCoordinate);
+                } else {
+                   hw->setFramecount(eDisableCursorDbg, 0, 0, 0);
+                }
+                invalidateHwcGeometry();
+                repaintEverything();
+                return NO_ERROR;
+            case 1012:  // Get show frame count parameters
+                reply->writeInt32(mDebugFrameCountFlag);
+                reply->writeInt32(mDebugFrameCountXCoordinate);
+                reply->writeInt32(mDebugFrameCountYCoordinate);
+                return NO_ERROR;
+            case 1016:  // enable/disable frame count increase
+                n = data.readInt32();
+                mDebugFrameCountIncFlag = n;
+                return NO_ERROR;
             case 1013: {
                 Mutex::Autolock _l(mStateLock);
-                sp<const DisplayDevice> hw(getDefaultDisplayDevice());
                 reply->writeInt32(hw->getPageFlipCount());
             }
             return NO_ERROR;
