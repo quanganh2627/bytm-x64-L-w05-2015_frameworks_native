@@ -17,9 +17,16 @@
 #include <binder/BinderService.h>
 #include <SurfaceFlinger.h>
 
+#ifdef TARGET_HAS_MULTIPLE_DISPLAY
+#include <display/MultiDisplayService.h>
+#endif
+
 using namespace android;
 
 int main(int argc, char** argv) {
+#ifdef TARGET_HAS_MULTIPLE_DISPLAY
+    MultiDisplayService::instantiate();
+#endif
     SurfaceFlinger::publishAndJoinThreadPool(true);
     // When SF is launched in its own process, limit the number of
     // binder threads to 4.
