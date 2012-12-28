@@ -47,6 +47,8 @@ public:
     enum {
         eSynchronous = 0x01,
         eAnimation   = 0x02,
+        eTransition  = 0x04,
+        eOrientationEnd  = 0x08
     };
 
     enum {

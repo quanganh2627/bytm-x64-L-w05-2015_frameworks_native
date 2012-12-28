@@ -109,6 +109,12 @@ public:
     //! Flag the currently open transaction as an animation transaction.
     static void setAnimationTransaction();
 
+    //! Flag the currently open transaction as a transition transaction.
+    static void setTransitionTransaction(bool on);
+
+    //! Flag the currently open transaction as an OrientationEnd transaction.
+    static void setOrientationEndTransaction(bool end);
+
     status_t    hide(SurfaceID id);
     status_t    show(SurfaceID id);
     status_t    setFlags(SurfaceID id, uint32_t flags, uint32_t mask);
