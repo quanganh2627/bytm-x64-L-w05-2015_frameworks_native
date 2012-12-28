@@ -110,6 +110,12 @@ public:
     //! Flag the currently open transaction as an animation transaction.
     static void setAnimationTransaction();
 
+    //! Flag the currently open transaction as a transition transaction.
+    static void setTransitionTransaction(bool on);
+
+    //! Flag the currently open transaction as an OrientationEnd transaction.
+    static void setOrientationEndTransaction(bool end);
+
     status_t    hide(const sp<IBinder>& id);
     status_t    show(const sp<IBinder>& id);
     status_t    setFlags(const sp<IBinder>& id, uint32_t flags, uint32_t mask);

@@ -421,6 +421,8 @@ private:
     Condition mTransactionCV;
     bool mTransactionPending;
     bool mAnimTransactionPending;
+    bool mTransitionOn;
+    bool mOrientationEnd;
     Vector< sp<Layer> > mLayersPendingRemoval;
     SortedVector< wp<IBinder> > mGraphicBufferProducerList;
     // Last DisplayScaling status

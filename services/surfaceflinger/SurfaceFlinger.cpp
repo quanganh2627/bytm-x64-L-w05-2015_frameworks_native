@@ -88,6 +88,8 @@ SurfaceFlinger::SurfaceFlinger()
         mTransactionFlags(0),
         mTransactionPending(false),
         mAnimTransactionPending(false),
+        mTransitionOn(true),
+        mOrientationEnd(true),
         mDisplayScaleState(0),
         mLayersRemoved(false),
         mRepaintEverything(0),
@@ -947,12 +949,13 @@ void SurfaceFlinger::setUpHWComposer() {
                             // when rotation really happens on layers, set
                             // mBypassCompostion back to be false.
                             if (i==0 && dpy==0 && mBypassComposition) {
-                                const LayerBase::State& s(layer->drawingState());
-                                const uint32_t finalTransform =
-                                                    s.transform.getOrientation();
-                                if (finalTransform & Transform::ROT_INVALID) {
-                                    mBypassComposition = false;
-                                }
+                            }
+                            // when transition scale is disabled, and orientation
+                            // complete, set mBypassCompostion to be false too.
+                            if (!mTransitionOn &&
+                                mOrientationEnd &&
+                                mBypassComposition) {
+                                mBypassComposition = false;
                             }
                         }
                     }
@@ -1178,7 +1181,8 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             Rect viewport = state.viewport;
                             handleDisplayScaling(state, viewport, frame);
                             // set mBypassComposition once orientation change
-                            if (i==0 && (state.orientation != draw[i].orientation)) {
+                            if (i==0 &&
+                                (state.orientation != draw[i].orientation)) {
                                 mBypassComposition = true;
                             }
                             disp->setProjection(state.orientation,
@@ -1869,6 +1873,18 @@ void SurfaceFlinger::setTransactionState(
                 break;
             }
         }
+    }
+
+    if (flags & eTransition) {
+        mTransitionOn = true;
+    } else {
+        mTransitionOn = false;
+    }
+
+    if (flags & eOrientationEnd) {
+        mOrientationEnd = true;
+    } else {
+        mOrientationEnd = false;
     }
 
     size_t count = displays.size();
