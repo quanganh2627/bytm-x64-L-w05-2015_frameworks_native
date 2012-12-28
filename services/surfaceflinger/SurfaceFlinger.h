@@ -425,6 +425,8 @@ private:
     SortedVector<sp<LayerBase> > mLayerPurgatory;
     bool mTransactionPending;
     bool mAnimTransactionPending;
+    bool mTransitionOn;
+    bool mOrientationEnd;
     Vector<sp<LayerBase> > mLayersPendingRemoval;
     // Last DisplayScaling status
     uint32_t mDisplayScaleState;
