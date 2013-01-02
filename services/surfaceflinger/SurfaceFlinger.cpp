@@ -1705,10 +1705,8 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                     }
                 }
             }
-            layer->setAcquireFence(hw, *cur);
-        }
-        if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
             mAnimFlag = needDisableAnimation ? false : true;
+            layer->setAcquireFence(hw, *cur);
         }
     } else {
         // we're not using h/w composer
