@@ -72,6 +72,8 @@ public:
             GLenum texTarget = GL_TEXTURE_EXTERNAL_OES, bool useFenceSync = true,
             const sp<BufferQueue> &bufferQueue = 0);
 
+    virtual ~SurfaceTexture();
+
     // updateTexImage sets the image contents of the target texture to that of
     // the most recently queued buffer.
     //
