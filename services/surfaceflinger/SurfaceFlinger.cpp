@@ -2273,6 +2273,7 @@ void SurfaceFlinger::onScreenAcquired(const sp<const DisplayDevice>& hw) {
         }
     }
     mVisibleRegionsDirty = true;
+    mBypassComposition = false;
     repaintEverything();
 }
 
