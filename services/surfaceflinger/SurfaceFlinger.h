@@ -72,6 +72,13 @@ enum {
     eTransactionMask          = 0x07
 };
 
+enum {
+    eDisplayScaleNone            = 0,
+    eDisplayScaleFullscreen      = 1,
+    eDisplayScaleCenter          = 2,
+    eDisplayScaleAspect          = 3
+};
+
 class SurfaceFlinger : public BinderService<SurfaceFlinger>,
                        public BnSurfaceComposer,
                        private IBinder::DeathRecipient,
@@ -248,6 +255,9 @@ private:
      * if available and compute the dirty region.
      */
     void handlePageFlip();
+
+    // setDisplayScaling: binder transcation for display scaling
+    int setDisplayScaling(uint32_t scale);
 
     // handleDisplayScaling: calculate the scaled frame rect.
     void handleDisplayScaling(const DisplayDeviceState& state,

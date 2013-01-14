@@ -81,7 +81,6 @@ status_t DisplayState::write(Parcel& output) const {
     output.writeInt32(orientation);
     output.write(viewport);
     output.write(frame);
-    output.writeInt32(scale);
     return NO_ERROR;
 }
 
@@ -93,7 +92,6 @@ status_t DisplayState::read(const Parcel& input) {
     orientation = input.readInt32();
     input.read(viewport);
     input.read(frame);
-    scale = input.readInt32();
     return NO_ERROR;
 }
 
