@@ -109,15 +109,7 @@ struct DisplayState {
     enum {
         eSurfaceChanged             = 0x01,
         eLayerStackChanged          = 0x02,
-        eDisplayProjectionChanged   = 0x04,
-        eDisplayScaleChanged        = 0x08
-    };
-
-    enum {
-        eDisplayScaleNone            = 0,
-        eDisplayScaleFullscreen      = 1,
-        eDisplayScaleCenter          = 2,
-        eDisplayScaleAspect          = 3
+        eDisplayProjectionChanged   = 0x04
     };
 
     uint32_t what;
@@ -127,14 +119,6 @@ struct DisplayState {
     uint32_t orientation;
     Rect viewport;
     Rect frame;
-    union {
-        uint32_t scale;
-        struct {
-            uint16_t scaleMode;
-            uint8_t  scaleStepX;
-            uint8_t  scaleStepY;
-        };
-    };
     status_t write(Parcel& output) const;
     status_t read(const Parcel& input);
 };
