@@ -1366,6 +1366,29 @@ void SurfaceFlinger::commitTransaction()
     mTransactionCV.broadcast();
 }
 
+int SurfaceFlinger::setDisplayScaling(uint32_t scale)
+{
+    Mutex::Autolock _l(mStateLock);
+    int32_t result = NO_ERROR;
+    sp<IBinder> token =
+        getBuiltInDisplay(DisplayDevice::DISPLAY_EXTERNAL);
+    ssize_t dpyIdx = mCurrentState.displays.indexOfKey(token);
+    if (dpyIdx < 0)
+        return BAD_VALUE;
+
+    DisplayDeviceState& disp(mCurrentState.displays.editValueAt(dpyIdx));
+    if (disp.isValid()) {
+         if (disp.scale != scale) {
+             mDisplayScaleState = scale;
+             disp.scale = mDisplayScaleState;
+             setTransactionFlags(eDisplayTransactionNeeded);
+         }
+    } else {
+        result = INVALID_OPERATION;
+    }
+    return result;
+}
+
 void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
         Rect& viewport, Rect& frame)
 {
@@ -1381,12 +1404,12 @@ void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
         height = hwc.getHeight(state.type);
 
         switch (state.scaleMode) {
-        case DisplayState::eDisplayScaleFullscreen:
+        case eDisplayScaleFullscreen:
             frame.left = frame.top = 0;
             frame.right = width;
             frame.bottom = height;
             break;
-        case DisplayState::eDisplayScaleCenter:
+        case eDisplayScaleCenter:
         {
             int viewWidth;
             int viewHeight;
@@ -1433,8 +1456,8 @@ void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
             }
             break;
         }
-        case DisplayState::eDisplayScaleAspect:
-        case DisplayState::eDisplayScaleNone:
+        case eDisplayScaleAspect:
+        case eDisplayScaleNone:
         default:
             break;
         }
@@ -2004,13 +2027,6 @@ uint32_t SurfaceFlinger::setDisplayStateLocked(const DisplayState& s)
             if (disp.viewport != s.viewport) {
                 disp.viewport = s.viewport;
                 flags |= eDisplayTransactionNeeded;
-            }
-        }
-        if (what & DisplayState::eDisplayScaleChanged) {
-            if (disp.scale != s.scale) {
-                disp.scale = s.scale;
-                flags |= eDisplayTransactionNeeded;
-                mDisplayScaleState = disp.scale;
             }
         }
     }
@@ -2770,6 +2786,11 @@ status_t SurfaceFlinger::onTransact(
                 reply->writeInt32(hw->getPageFlipCount());
             }
             return NO_ERROR;
+            case 1014: // setDisplayScaling
+                n = data.readInt32();
+                int32_t result = setDisplayScaling((uint32_t)n);
+                reply->writeInt32(result);
+                return NO_ERROR;
         }
     }
     return err;

@@ -167,10 +167,6 @@ public:
             uint32_t orientation,
             const Rect& layerStackRect,
             const Rect& displayRect);
-    void setDisplayScaling(const sp<IBinder>& token,
-            uint32_t scaleMode,
-            uint32_t scaleStepX,
-            uint32_t scaleStepY);
 
     static void setAnimationTransaction() {
         Composer::getInstance().setAnimationTransactionImpl();
@@ -426,19 +422,6 @@ void Composer::setDisplayProjection(const sp<IBinder>& token,
     mForceSynchronous = true; // TODO: do we actually still need this?
 }
 
-void Composer::setDisplayScaling(const sp<IBinder>& token,
-        uint32_t scaleMode,
-        uint32_t scaleStepX,
-        uint32_t scaleStepY) {
-    Mutex::Autolock _l(mLock);
-    DisplayState& s(getDisplayStateLocked(token));
-    s.scaleMode = (uint16_t)scaleMode;
-    s.scaleStepX = (uint8_t)scaleStepX;
-    s.scaleStepY = (uint8_t)scaleStepY;
-    s.what |= DisplayState::eDisplayScaleChanged;
-    mForceSynchronous = true; // TODO: do we actually still need this?
-}
-
 // ---------------------------------------------------------------------------
 
 SurfaceComposerClient::SurfaceComposerClient()
@@ -619,14 +602,6 @@ void SurfaceComposerClient::setDisplayProjection(const sp<IBinder>& token,
         const Rect& displayRect) {
     Composer::getInstance().setDisplayProjection(token, orientation,
             layerStackRect, displayRect);
-}
-
-void SurfaceComposerClient::setDisplayScaling(const sp<IBinder>& token,
-        uint32_t scaleMode,
-        uint32_t scaleStepX,
-        uint32_t scaleStepY) {
-    Composer::getInstance().setDisplayScaling(token, scaleMode,
-            scaleStepX, scaleStepY);
 }
 
 // ----------------------------------------------------------------------------

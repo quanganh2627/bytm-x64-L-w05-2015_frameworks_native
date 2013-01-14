@@ -148,18 +148,6 @@ public:
             const Rect& layerStackRect,
             const Rect& displayRect);
 
-    /* setDisplayScaling is used to change HDMI display projection mode and
-     * calibrate HDMI display area on HDTVs.
-     *
-     * - scaleMode defines the scaling mode, aspect, center or fullscreen.
-     * - scaleStepX defines the calibration steps in both horizontal direction.
-     * - scaleStepY defines the calibration steps in vertial direction.
-     */
-    static void setDisplayScaling(const sp<IBinder>& token,
-            uint32_t scaleMode,
-            uint32_t scaleStepX,
-            uint32_t scaleStepY);
-
 private:
     virtual void onFirstRef();
     Composer& getComposer();
