@@ -42,7 +42,12 @@ class BufferQueue : public BnGraphicBufferProducer,
                     private IBinder::DeathRecipient {
 public:
     enum { MIN_UNDEQUEUED_BUFFERS = 2 };
-    enum { NUM_BUFFER_SLOTS = 32 };
+    enum { NUM_BUFFER_SLOTS =
+#ifdef GFX_BUF_EXT
+    64 }; // extend GFX buffer from 32 to 64 for VPP support
+#else
+    32 };
+#endif
     enum { NO_CONNECTED_API = 0 };
     enum { INVALID_BUFFER_SLOT = -1 };
     enum { STALE_BUFFER_SLOT = 1, NO_BUFFER_AVAILABLE, PRESENT_LATER };
