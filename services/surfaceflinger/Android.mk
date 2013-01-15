@@ -85,6 +85,11 @@ endif
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
+# for VPP support on MRFLD only
+ifeq ($(TARGET_HAS_VPP), true)
+    LOCAL_CFLAGS += -DGFX_BUF_EXT
+endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	liblog \
