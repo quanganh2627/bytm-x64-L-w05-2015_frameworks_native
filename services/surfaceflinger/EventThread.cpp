@@ -369,10 +369,12 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
     for (size_t i=0 ; i<mDisplayEventConnections.size() ; i++) {
         sp<Connection> connection =
                 mDisplayEventConnections.itemAt(i).promote();
-        result.appendFormat("    %p: count=%d, requested: %lldus ago.\n",
-                connection.get(), connection!=NULL ? connection->count : 0,
-                (connection->mLastRequestTimestamp ?
-                ((systemTime(CLOCK_MONOTONIC)-connection->mLastRequestTimestamp)/1000) : 0));
+        if (connection != NULL) {
+            result.appendFormat("    %p: count=%d, requested: %lldus\n",
+                    connection.get(), connection->count,
+                    (connection->mLastRequestTimestamp ?
+		            ((systemTime(CLOCK_MONOTONIC)-connection->mLastRequestTimestamp)/1000) : 0));
+        }
     }
 }
 
