@@ -326,14 +326,17 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
     mLastVSyncTimestamp = currentVSyncTimestamp;
     mLastVSyncDisplayType = currentVSyncDisplayType;
 
-    const nsecs_t VSYNC_WARNING_THRESHOLD = 100000000; //100ms
-    nsecs_t syncResponseinterval = systemTime(CLOCK_MONOTONIC) -
-                                                Connection::s_oldestUnreponsedRequestTimestamp;
-    if( syncResponseinterval > VSYNC_WARNING_THRESHOLD ){
-               ALOGW(" warning! VSYNC take %lld ms to deliever!" ,syncResponseinterval/1000000);
-    }
-    Connection::s_oldestUnreponsedRequestTimestamp = 0;
 
+    //take care are only single shot request mode
+    if(Connection::s_oldestUnreponsedRequestTimestamp != 0){
+        const nsecs_t VSYNC_WARNING_THRESHOLD = 100000000; //100ms
+        nsecs_t syncResponseinterval = systemTime(CLOCK_MONOTONIC) - 
+            Connection::s_oldestUnreponsedRequestTimestamp;
+        if( syncResponseinterval > VSYNC_WARNING_THRESHOLD ){
+               ALOGW(" warning! VSYNC take %lld ms to deliver!" ,syncResponseinterval/1000000);
+        }
+        Connection::s_oldestUnreponsedRequestTimestamp = 0;
+    }
     // here we're guaranteed to have a timestamp and some connections to signal
     // (The connections might have dropped out of mDisplayEventConnections
     // while we were asleep, but we'll still have strong references to them.)
