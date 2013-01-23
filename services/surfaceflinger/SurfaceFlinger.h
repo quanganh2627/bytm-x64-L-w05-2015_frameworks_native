@@ -473,9 +473,9 @@ private:
     int mDebugRegion;
     int mDebugFrameCountFlag;
     int mDebugFrameCountIncFlag;
-    int mDebugFrameCount;
     int mDebugFrameCountXCoordinate;
     int mDebugFrameCountYCoordinate;
+    int mDebugFrameCount;
     int mDebugDDMS;
     int mDebugDisableHWC;
     int mDebugDisableTransformHint;
@@ -484,7 +484,6 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
-    bool mBypassComposition;
     bool mAnimFlag;
 
     // these are thread safe
@@ -503,6 +502,7 @@ private:
      */
 
     sp<IBinder> mExtDisplayToken;
+    bool mBypassComposition;
 };
 
 // ---------------------------------------------------------------------------
