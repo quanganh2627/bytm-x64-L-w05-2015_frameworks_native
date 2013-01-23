@@ -40,10 +40,10 @@ namespace android {
 EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
     : mFlinger(flinger),
       mLastVSyncTimestamp(0),
-      mLastVSyncDisplayType(-1),
       mUseSoftwareVSync(false),
-      mVsyncDisabled(false),
-      mDebugVsyncEnabled(false) {
+      mLastVSyncDisplayType(-1),
+      mDebugVsyncEnabled(false),
+      mVsyncDisabled(false){
 
     for (int32_t i=0 ; i<HWC_DISPLAY_TYPES_SUPPORTED ; i++) {
         mVSyncEvent[i].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
