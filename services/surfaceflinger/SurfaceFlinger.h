@@ -483,7 +483,6 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
-    bool mBypassComposition;
     bool mAnimFlag;
 
     // these are thread safe
@@ -503,6 +502,7 @@ private:
      */
 
     sp<IBinder> mExtDisplayToken;
+    bool mBypassComposition;
 };
 
 // ---------------------------------------------------------------------------
