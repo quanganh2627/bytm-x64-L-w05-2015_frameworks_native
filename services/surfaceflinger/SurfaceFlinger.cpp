@@ -957,7 +957,8 @@ void SurfaceFlinger::setUpHWComposer() {
                             }
                             // when rotation really happens on layers, set
                             // mBypassCompostion back to be false.
-                            if (i==0 && dpy==0 && mBypassComposition) {
+                            if (i==0 && mBypassComposition &&
+                                hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
                                 const LayerBase::State& s(layer->drawingState());
                                 const uint32_t finalTransform =
                                                     s.transform.getOrientation();
@@ -1013,7 +1014,8 @@ void SurfaceFlinger::doComposition() {
         // orientation changed but rotation has not happen
         // on layers. It is used to optimize user experience
         // of external display rotation animation.
-        if (dpy == 1 && mBypassComposition)
+        if (mBypassComposition &&
+            hw->getDisplayType() == DisplayDevice::DISPLAY_EXTERNAL)
             continue;
 
         if (hw->canDraw()) {
@@ -1200,8 +1202,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                             Rect viewport = state.viewport;
                             handleDisplayScaling(state, viewport, frame);
                             // set mBypassComposition once orientation change
-                            if (i==0 &&
-                                (state.orientation != draw[i].orientation)) {
+                            if (state.orientation != draw[i].orientation) {
                                 mBypassComposition = true;
                             }
                             disp->setProjection(state.orientation,
