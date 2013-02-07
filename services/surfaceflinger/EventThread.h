@@ -51,6 +51,7 @@ class EventThread : public Thread {
         // count ==-1 : one-shot event that fired this round / disabled
         int32_t count;
         static nsecs_t s_oldestUnreponsedRequestTimestamp;
+        nsecs_t mLastConsumeTimestamp;
 
     private:
         virtual ~Connection();
