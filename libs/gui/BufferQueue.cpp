@@ -30,7 +30,6 @@
 
 #include <utils/Log.h>
 #include <utils/Trace.h>
-
 #ifdef USE_IMG_GRAPHICS
 #include <hal_public.h>
 #endif
@@ -537,7 +536,6 @@ status_t BufferQueue::queueBuffer(int buf,
                     "buffer in slot %d", buf);
             return -EINVAL;
         }
-
 #ifdef USE_IMG_GRAPHICS
         if (mSlots[buf].mGraphicBuffer->handle != NULL) {
             IMG_native_handle_t *nativeBuffer =
@@ -557,20 +555,48 @@ status_t BufferQueue::queueBuffer(int buf,
             // be consumed.
             listener = mConsumerListener;
         } else {
-            // In asynchronous mode we only keep the most recent buffer.
-            if (mQueue.empty()) {
-                mQueue.push_back(buf);
+            bool usePureAsyncMode = true;
+            if (mConnectedApi == NATIVE_WINDOW_API_MEDIA)
+                usePureAsyncMode = false;
+            if (!usePureAsyncMode) {
+                // Here we couldn't use a pure asynchronous mode for video playback,
+                // because there is a timing sequence issue between
+                // video queue buffer and SurfaceFlinger's vsync.
+                // Video render is different with GUI,
+                // GUI will wait for a vsync from HWC, then queue buffer.
+                // So increase buffer's number to 2 to avoid buffer overwrite,
+                // and 1 video frame latency is acceptable for A/V sync.
+                if (mQueue.size() <= 1) {
+                    mQueue.push_back(buf);
 
-                // Asynchronous mode only signals that a frame should be
-                // consumed if no previous frame was pending. If a frame were
-                // pending then the consumer would have already been notified.
-                listener = mConsumerListener;
+                    // Asynchronous mode only signals that a frame should be
+                    // consumed if no previous frame was pending. If a frame were
+                    // pending then the consumer would have already been notified.
+                    listener = mConsumerListener;
+                } else {
+                    // clear all queued buffers
+                    Fifo::iterator i(mQueue.begin());
+                    while(i != mQueue.end())
+                        mSlots[*i++].mBufferState = BufferSlot::FREE;
+                    mQueue.clear();
+                    mQueue.push_back(buf);
+                }
             } else {
-                Fifo::iterator front(mQueue.begin());
-                // buffer currently queued is freed
-                mSlots[*front].mBufferState = BufferSlot::FREE;
-                // and we record the new buffer index in the queued list
-                *front = buf;
+                // In asynchronous mode we only keep the most recent buffer.
+                if (mQueue.empty()) {
+                    mQueue.push_back(buf);
+
+                    // Asynchronous mode only signals that a frame should be
+                    // consumed if no previous frame was pending. If a frame were
+                    // pending then the consumer would have already been notified.
+                    listener = mConsumerListener;
+                } else {
+                    Fifo::iterator front(mQueue.begin());
+                    // buffer currently queued is freed
+                    mSlots[*front].mBufferState = BufferSlot::FREE;
+                    // and we record the new buffer index in the queued list
+                    *front = buf;
+                }
             }
         }
 
