@@ -46,6 +46,7 @@ static char screenshot_path[PATH_MAX] = "";
 /* dumps the current system state to stdout */
 static void dumpstate() {
     time_t now = time(NULL);
+    struct tm *time_tmp;
     char build[PROPERTY_VALUE_MAX], fingerprint[PROPERTY_VALUE_MAX];
     char radio[PROPERTY_VALUE_MAX], bootloader[PROPERTY_VALUE_MAX];
     char network[PROPERTY_VALUE_MAX], date[80];
@@ -57,7 +58,8 @@ static void dumpstate() {
     property_get("ro.baseband", radio, "(unknown)");
     property_get("ro.bootloader", bootloader, "(unknown)");
     property_get("gsm.operator.alpha", network, "(unknown)");
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    time_tmp = localtime((const time_t *)&now);
+    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", time_tmp);
 
     printf("========================================================\n");
     printf("== dumpstate: %s\n", date);
@@ -448,7 +450,9 @@ int main(int argc, char *argv[]) {
         if (do_add_date) {
             char date[80];
             time_t now = time(NULL);
-            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", localtime(&now));
+            struct tm *time_tmp;
+            time_tmp = localtime((const time_t *)&now);
+            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
             strlcat(path, date, sizeof(path));
         }
         if (do_fb) {
