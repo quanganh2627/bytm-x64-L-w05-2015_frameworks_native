@@ -32,6 +32,10 @@
 #include <gui/SurfaceTexture.h>
 #include <utils/Trace.h>
 
+#ifdef USE_IMG_GRAPHICS
+#include <hal_public.h>
+#endif
+
 // Macros for including the BufferQueue name in log messages
 #define ST_LOGV(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 #define ST_LOGD(x, ...) ALOGD("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
@@ -488,6 +492,11 @@ status_t BufferQueue::queueBuffer(int buf,
     sp<Fence> fence;
 
     input.deflate(&timestamp, &crop, &scalingMode, &transform, &fence);
+    bool privateFlag = false;
+    if (scalingMode & (1 << 31)) {
+        scalingMode &= ~(1 << 31);
+        privateFlag = true;
+    }
 
     ST_LOGV("queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
             "scale=%s",
@@ -526,6 +535,17 @@ status_t BufferQueue::queueBuffer(int buf,
                     "buffer in slot %d", buf);
             return -EINVAL;
         }
+
+#ifdef USE_IMG_GRAPHICS
+        if (mSlots[buf].mGraphicBuffer->handle != NULL) {
+            IMG_native_handle_t *nativeBuffer =
+                (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
+            if (privateFlag)
+                nativeBuffer->hint |= GRALLOC_HAL_HINT_TIME_SEEKING;
+            else
+                nativeBuffer->hint &= ~GRALLOC_HAL_HINT_TIME_SEEKING;
+        }
+#endif
 
         if (mSynchronousMode) {
             // In synchronous mode we queue all buffers in a FIFO.
