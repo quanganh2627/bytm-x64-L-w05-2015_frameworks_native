@@ -270,6 +270,12 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
         return i;
     }
 
+    // Put a special trick mode flag
+    uint32_t trickModeFlag = 0;
+    if (buffer->usage & GRALLOC_USAGE_PRIVATE_2) {
+        buffer->usage &= ~GRALLOC_USAGE_PRIVATE_2;
+        trickModeFlag = (1 << 30);
+    }
 
     // Make sure the crop rectangle is entirely inside the buffer.
     Rect crop;
@@ -277,7 +283,7 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
 
     sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : Fence::NO_FENCE);
     IGraphicBufferProducer::QueueBufferOutput output;
-    IGraphicBufferProducer::QueueBufferInput input(timestamp, crop, mScalingMode,
+    IGraphicBufferProducer::QueueBufferInput input(timestamp, crop, mScalingMode | trickModeFlag,
             mTransform, fence);
     status_t err = mGraphicBufferProducer->queueBuffer(i, input, &output);
     if (err != OK)  {
