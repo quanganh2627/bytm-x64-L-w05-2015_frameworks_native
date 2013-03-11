@@ -223,15 +223,6 @@ public:
         memcpy(info, reply.readInplace(sizeof(DisplayInfo)), sizeof(DisplayInfo));
         return reply.readInt32();
     }
-
-    virtual bool isAnimationPermitted()
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
-        remote()->transact(BnSurfaceComposer::IS_ANIMATION_PERMITTED, data, &reply);
-        bool result = reply.readInt32();
-        return result;
-    }
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -339,11 +330,6 @@ status_t BnSurfaceComposer::onTransact(
             sp<IBinder> display = data.readStrongBinder();
             status_t result = getDisplayInfo(display, &info);
             memcpy(reply->writeInplace(sizeof(DisplayInfo)), &info, sizeof(DisplayInfo));
-            reply->writeInt32(result);
-        } break;
-        case IS_ANIMATION_PERMITTED: {
-            CHECK_INTERFACE(ISurfaceComposer, data, reply);
-            int32_t result = isAnimationPermitted() ? 1 : 0;
             reply->writeInt32(result);
         } break;
         default:

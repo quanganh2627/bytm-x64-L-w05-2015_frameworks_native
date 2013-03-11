@@ -46,7 +46,6 @@ static char screenshot_path[PATH_MAX] = "";
 /* dumps the current system state to stdout */
 static void dumpstate() {
     time_t now = time(NULL);
-    struct tm *time_tmp;
     char build[PROPERTY_VALUE_MAX], fingerprint[PROPERTY_VALUE_MAX];
     char radio[PROPERTY_VALUE_MAX], bootloader[PROPERTY_VALUE_MAX];
     char network[PROPERTY_VALUE_MAX], date[80];
@@ -58,8 +57,7 @@ static void dumpstate() {
     property_get("ro.baseband", radio, "(unknown)");
     property_get("ro.bootloader", bootloader, "(unknown)");
     property_get("gsm.operator.alpha", network, "(unknown)");
-    time_tmp = localtime((const time_t *)&now);
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", time_tmp);
+    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
     printf("========================================================\n");
     printf("== dumpstate: %s\n", date);
@@ -89,7 +87,6 @@ static void dumpstate() {
     dump_file("BUDDYINFO", "/proc/buddyinfo");
     dump_file("FRAGMENTATION INFO", "/d/extfrag/unusable_index");
 
-    dump_file("PMUSTATES", "/sys/kernel/debug/mid_pmu_states");
 
     dump_file("KERNEL WAKELOCKS", "/proc/wakelocks");
     dump_file("KERNEL WAKE SOURCES", "/d/wakeup_sources");
@@ -424,9 +421,7 @@ int main(int argc, char *argv[]) {
         if (do_add_date) {
             char date[80];
             time_t now = time(NULL);
-            struct tm *time_tmp;
-            time_tmp = localtime((const time_t *)&now);
-            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
+            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", localtime(&now));
             strlcat(path, date, sizeof(path));
         }
         if (do_fb) {

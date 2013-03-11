@@ -152,10 +152,6 @@ status_t FramebufferSurface::compositionComplete()
     return mHwc.fbCompositionComplete();
 }
 
-status_t FramebufferSurface::setFramecount(int cmd, int count, int x, int y)
-{
-    return mHwc.setFramecount(cmd, count, x, y);
-}
 void FramebufferSurface::dump(String8& result) {
     mHwc.fbDump(result);
     ConsumerBase::dump(result);

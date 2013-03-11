@@ -188,12 +188,6 @@ status_t DisplayDevice::compositionComplete() const {
     return mFramebufferSurface->compositionComplete();
 }
 
-status_t DisplayDevice::setFramecount(int cmd, int count, int x, int y) const {
-    if (mFramebufferSurface == NULL) {
-        return NO_ERROR;
-    }
-    return mFramebufferSurface->setFramecount(cmd, count, x, y);
-}
 void DisplayDevice::flip(const Region& dirty) const
 {
     checkGLErrors();

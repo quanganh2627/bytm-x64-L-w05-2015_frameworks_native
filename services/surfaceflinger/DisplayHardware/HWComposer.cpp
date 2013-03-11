@@ -370,7 +370,7 @@ status_t HWComposer::queryDisplayProperties(int disp) {
     }
 
     // FIXME: what should we set the format to?
-    mDisplayData[disp].format = HAL_PIXEL_FORMAT_BGRA_8888;
+    mDisplayData[disp].format = HAL_PIXEL_FORMAT_RGBA_8888;
     mDisplayData[disp].connected = true;
     if (mDisplayData[disp].xdpi == 0.0f || mDisplayData[disp].ydpi == 0.0f) {
         // is there anything smarter we can do?
@@ -569,8 +569,6 @@ status_t HWComposer::prepare() {
         if (!disp.connected && disp.list != NULL) {
             ALOGW("WARNING: disp %d: connected, non-null list, layers=%d",
                   i, disp.list->numHwLayers);
-            free(disp.list);
-            disp.list = NULL;
         }
         mLists[i] = disp.list;
         if (mLists[i]) {
@@ -714,7 +712,7 @@ int HWComposer::getVisualID() const {
         // FIXME: temporary hack until HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
         // is supported by the implementation. we can only be in this case
         // if we have HWC 1.1
-        return HAL_PIXEL_FORMAT_BGRA_8888;
+        return HAL_PIXEL_FORMAT_RGBA_8888;
         //return HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     } else {
         return mFbDev->format;
@@ -738,34 +736,11 @@ int HWComposer::fbPost(int32_t id,
 }
 
 int HWComposer::fbCompositionComplete() {
-    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
-       if (mHwc->reserved_proc[0]) {
-            int (*compositionComplete)(struct hwc_composer_device_1*, int) =
-                (int (*)(hwc_composer_device_1*, int))mHwc->reserved_proc[0];
-            compositionComplete(mHwc, 0);
-        }
+    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1))
         return NO_ERROR;
-    }
 
     if (mFbDev->compositionComplete) {
         return mFbDev->compositionComplete(mFbDev);
-    } else {
-        return INVALID_OPERATION;
-    }
-}
-
-int HWComposer::setFramecount(int cmd, int count, int x, int y) {
-    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
-       if (mHwc->reserved_proc[1]) {
-            int (*setFramecount)(struct hwc_composer_device_1*, int, int, int, int) =
-                (int (*)(hwc_composer_device_1*, int, int, int, int))mHwc->reserved_proc[1];
-            setFramecount(mHwc, cmd, count, x, y);
-        }
-        return NO_ERROR;
-    }
-
-    if (mFbDev->compositionComplete) {
-        return mFbDev->setFramecount(cmd, count, x, y);
     } else {
         return INVALID_OPERATION;
     }

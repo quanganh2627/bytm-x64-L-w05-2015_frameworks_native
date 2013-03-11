@@ -66,7 +66,6 @@ public:
 
     // Get information about a display
     static status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
-    static bool isAnimationPermitted();
 
     /* triggers screen off and waits for it to complete */
     static void blankDisplay(const sp<IBinder>& display);
@@ -108,12 +107,6 @@ public:
 
     //! Flag the currently open transaction as an animation transaction.
     static void setAnimationTransaction();
-
-    //! Flag the currently open transaction as a transition transaction.
-    static void setTransitionTransaction(bool on);
-
-    //! Flag the currently open transaction as an OrientationEnd transaction.
-    static void setOrientationEndTransaction(bool end);
 
     status_t    hide(SurfaceID id);
     status_t    show(SurfaceID id);
