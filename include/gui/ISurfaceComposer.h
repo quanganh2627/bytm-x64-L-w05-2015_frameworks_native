@@ -47,6 +47,8 @@ public:
     enum {
         eSynchronous = 0x01,
         eAnimation   = 0x02,
+        eTransition  = 0x04,
+        eOrientationEnd  = 0x08
     };
 
     enum {
@@ -109,6 +111,7 @@ public:
     /* returns information about a display
      * intended to be used to get information about built-in displays */
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info) = 0;
+    virtual bool isAnimationPermitted() = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -130,6 +133,7 @@ public:
         BLANK,
         UNBLANK,
         GET_DISPLAY_INFO,
+        IS_ANIMATION_PERMITTED,
         CONNECT_DISPLAY,
     };
 

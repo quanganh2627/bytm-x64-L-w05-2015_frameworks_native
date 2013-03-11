@@ -73,6 +73,18 @@ enum {
     eDisplayTransactionNeeded = 0x04,
     eTransactionMask          = 0x07
 };
+enum {
+    eUpdateCursorDbg,
+    eEnableCursorDbg,
+    eDisableCursorDbg
+};
+
+enum {
+    eDisplayScaleNone            = 0,
+    eDisplayScaleFullscreen      = 1,
+    eDisplayScaleCenter          = 2,
+    eDisplayScaleAspect          = 3
+};
 
 class SurfaceFlinger : public BinderService<SurfaceFlinger>,
                        public BnSurfaceComposer,
@@ -170,6 +182,14 @@ private:
         uint8_t orientation;
         String8 displayName;
         bool isSecure;
+        union {
+            uint32_t scale;
+            struct {
+                uint16_t scaleMode;
+                uint8_t  scaleStepX;
+                uint8_t  scaleStepY;
+            };
+        };
     };
 
     struct State {
@@ -206,6 +226,7 @@ private:
     // called when screen is turning back on
     virtual void unblank(const sp<IBinder>& display);
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
+    virtual bool isAnimationPermitted();
 
     /* ------------------------------------------------------------------------
      * DeathRecipient interface
@@ -251,6 +272,13 @@ private:
      * if available and compute the dirty region.
      */
     void handlePageFlip();
+
+    // setDisplayScaling: binder transcation for display scaling
+    int setDisplayScaling(uint32_t scale);
+
+    // handleDisplayScaling: calculate the scaled frame rect.
+    void handleDisplayScaling(const DisplayDeviceState& state,
+        Rect& viewport, Rect& frame);
 
     /* ------------------------------------------------------------------------
      * Transactions
@@ -391,6 +419,9 @@ private:
     void dumpAllLocked(String8& result, char* buffer, size_t SIZE) const;
     bool startDdmConnection();
     static void appendSfConfigString(String8& result);
+    bool alreadyLockedBySurfaceFlingerThread(){
+            return (getThreadId() == mSurfaceFlingerThreadId) && mMutexLocked;
+    };
 
     /* ------------------------------------------------------------------------
      * Attributes
@@ -404,7 +435,11 @@ private:
     SortedVector<sp<LayerBase> > mLayerPurgatory;
     bool mTransactionPending;
     bool mAnimTransactionPending;
+    bool mTransitionOn;
+    bool mOrientationEnd;
     Vector<sp<LayerBase> > mLayersPendingRemoval;
+    // Last DisplayScaling status
+    uint32_t mDisplayScaleState;
 
     // protected by mStateLock (but we could use another lock)
     bool mLayersRemoved;
@@ -436,6 +471,11 @@ private:
 
     // don't use a lock for these, we don't care
     int mDebugRegion;
+    int mDebugFrameCountFlag;
+    int mDebugFrameCountIncFlag;
+    int mDebugFrameCountXCoordinate;
+    int mDebugFrameCountYCoordinate;
+    int mDebugFrameCount;
     int mDebugDDMS;
     int mDebugDisableHWC;
     int mDebugDisableTransformHint;
@@ -444,6 +484,7 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
+    bool mAnimFlag;
 
     // these are thread safe
     mutable MessageQueue mEventQueue;
@@ -453,11 +494,15 @@ private:
     mutable Mutex mDestroyedLayerLock;
     Vector<LayerBase const *> mDestroyedLayers;
 
+   //for work around the dead lock
+   bool                        mMutexLocked;
+   thread_id_t                 mSurfaceFlingerThreadId;
     /* ------------------------------------------------------------------------
      * Feature prototyping
      */
 
     sp<IBinder> mExtDisplayToken;
+    bool mBypassComposition;
 };
 
 // ---------------------------------------------------------------------------

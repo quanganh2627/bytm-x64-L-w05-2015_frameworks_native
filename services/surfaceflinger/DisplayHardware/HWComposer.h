@@ -125,6 +125,7 @@ public:
     // Forwarding to FB HAL for pre-HWC-1.1 code (see FramebufferSurface).
     int fbPost(int32_t id, const sp<Fence>& acquireFence, const sp<GraphicBuffer>& buf);
     int fbCompositionComplete();
+    int setFramecount(int cmd, int count, int x, int y);
     void fbDump(String8& result);
 
     /*
@@ -141,6 +142,7 @@ public:
         virtual int32_t getCompositionType() const = 0;
         virtual uint32_t getHints() const = 0;
         virtual int getAndResetReleaseFenceFd() = 0;
+        virtual void setPerFrameDefaultState() = 0;
         virtual void setDefaultState() = 0;
         virtual void setSkip(bool skip) = 0;
         virtual void setBlending(uint32_t blending) = 0;

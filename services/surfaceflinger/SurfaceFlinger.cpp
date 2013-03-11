@@ -88,12 +88,20 @@ SurfaceFlinger::SurfaceFlinger()
         mTransactionFlags(0),
         mTransactionPending(false),
         mAnimTransactionPending(false),
+        mTransitionOn(true),
+        mOrientationEnd(true),
+        mDisplayScaleState(0),
         mLayersRemoved(false),
         mRepaintEverything(0),
         mBootTime(systemTime()),
         mVisibleRegionsDirty(false),
         mHwWorkListDirty(false),
         mDebugRegion(0),
+        mDebugFrameCountFlag(0),
+        mDebugFrameCountIncFlag(0),
+        mDebugFrameCountXCoordinate(0),
+        mDebugFrameCountYCoordinate(0),
+        mDebugFrameCount(0),
         mDebugDDMS(0),
         mDebugDisableHWC(0),
         mDebugDisableTransformHint(0),
@@ -101,7 +109,11 @@ SurfaceFlinger::SurfaceFlinger()
         mLastSwapBufferTime(0),
         mDebugInTransaction(0),
         mLastTransactionTime(0),
-        mBootFinished(false)
+        mBootFinished(false),
+        mAnimFlag(true),
+        mMutexLocked(false),
+        mSurfaceFlingerThreadId(0),
+        mBypassComposition(false)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -534,6 +546,8 @@ status_t SurfaceFlinger::readyToRun()
     // start boot animation
     startBootAnim();
 
+    mSurfaceFlingerThreadId = getThreadId();
+
     return NO_ERROR;
 }
 
@@ -670,6 +684,8 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
     info->xdpi = xdpi;
     info->ydpi = ydpi;
     info->fps = float(1e9 / hwc.getRefreshPeriod(type));
+    mDebugFrameCountXCoordinate = info->w;
+    mDebugFrameCountYCoordinate = info->h;
 
     // All non-virtual displays are currently considered secure.
     info->secure = true;
@@ -749,6 +765,7 @@ void SurfaceFlinger::onHotplugReceived(int type, bool connected) {
             mCurrentState.displays.removeItem(mDefaultDisplays[type]);
         } else {
             DisplayDeviceState info((DisplayDevice::DisplayType)type);
+            info.scale = mDisplayScaleState;
             mCurrentState.displays.add(mDefaultDisplays[type], info);
         }
         setTransactionFlags(eDisplayTransactionNeeded);
@@ -938,6 +955,24 @@ void SurfaceFlinger::setUpHWComposer() {
                             if (mDebugDisableHWC || mDebugRegion) {
                                 cur->setSkip(true);
                             }
+                            // when rotation really happens on layers, set
+                            // mBypassCompostion back to be false.
+                            if (i==0 && mBypassComposition &&
+                                hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+                                const LayerBase::State& s(layer->drawingState());
+                                const uint32_t finalTransform =
+                                                    s.transform.getOrientation();
+                                if (finalTransform & Transform::ROT_INVALID) {
+                                    mBypassComposition = false;
+                                }
+                            }
+                            // when transition scale is disabled, and orientation
+                            // complete, set mBypassCompostion to be false too.
+                            if (!mTransitionOn &&
+                                mOrientationEnd &&
+                                mBypassComposition) {
+                                mBypassComposition = false;
+                            }
                         }
                     }
                 }
@@ -975,6 +1010,14 @@ void SurfaceFlinger::doComposition() {
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         const sp<DisplayDevice>& hw(mDisplays[dpy]);
+        // Bypass composition on external display when
+        // orientation changed but rotation has not happen
+        // on layers. It is used to optimize user experience
+        // of external display rotation animation.
+        if (mBypassComposition &&
+            hw->getDisplayType() == DisplayDevice::DISPLAY_EXTERNAL)
+            continue;
+
         if (hw->canDraw()) {
             // transform the dirty region into this screen's coordinate space
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
@@ -990,6 +1033,16 @@ void SurfaceFlinger::doComposition() {
         hw->compositionComplete();
     }
     postFramebuffer();
+    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
+    if (CC_UNLIKELY(mDebugFrameCountFlag)) {
+        hw->setFramecount(eUpdateCursorDbg, (mDebugFrameCount%16), 0, 0);
+        if (CC_UNLIKELY(mDebugFrameCountIncFlag))
+            mDebugFrameCount++;
+        if (mDebugFrameCount >= 9999)
+            mDebugFrameCount = 0;
+        ATRACE_INT("compositionDbg", mDebugFrameCount);
+    }
+
 }
 
 void SurfaceFlinger::postFramebuffer()
@@ -1038,23 +1091,28 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 {
     ATRACE_CALL();
 
-    Mutex::Autolock _l(mStateLock);
-    const nsecs_t now = systemTime();
-    mDebugInTransaction = now;
+    {
+        // scope for the mutex
+        Mutex::Autolock _l(mStateLock);
+        mMutexLocked = true;
+        const nsecs_t now = systemTime();
+        mDebugInTransaction = now;
 
-    // Here we're guaranteed that some transaction flags are set
-    // so we can call handleTransactionLocked() unconditionally.
-    // We call getTransactionFlags(), which will also clear the flags,
-    // with mStateLock held to guarantee that mCurrentState won't change
-    // until the transaction is committed.
+        // Here we're guaranteed that some transaction flags are set
+        // so we can call handleTransactionLocked() unconditionally.
+        // We call getTransactionFlags(), which will also clear the flags,
+        // with mStateLock held to guarantee that mCurrentState won't change
+        // until the transaction is committed.
 
-    transactionFlags = getTransactionFlags(eTransactionMask);
-    handleTransactionLocked(transactionFlags);
+        transactionFlags = getTransactionFlags(eTransactionMask);
+        handleTransactionLocked(transactionFlags);
 
-    mLastTransactionTime = systemTime() - now;
-    mDebugInTransaction = 0;
-    invalidateHwcGeometry();
-    // here the transaction has been committed
+        mLastTransactionTime = systemTime() - now;
+        mDebugInTransaction = 0;
+        invalidateHwcGeometry();
+        // here the transaction has been committed
+    }
+    mMutexLocked = false;
 }
 
 void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
@@ -1069,7 +1127,7 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
 
     if (transactionFlags & eTraversalNeeded) {
         for (size_t i=0 ; i<count ; i++) {
-            const sp<LayerBase>& layer = currentLayers[i];
+            const sp<LayerBase>& layer(currentLayers[i]);
             uint32_t trFlags = layer->getTransactionFlags(eTransactionNeeded);
             if (!trFlags) continue;
 
@@ -1137,22 +1195,18 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         }
                         if ((state.orientation != draw[i].orientation)
                                 || (state.viewport != draw[i].viewport)
-                                || (state.frame != draw[i].frame))
+                                || (state.frame != draw[i].frame)
+                                || (state.scale != draw[i].scale))
                         {
+                            Rect frame = state.frame;
+                            Rect viewport = state.viewport;
+                            handleDisplayScaling(state, viewport, frame);
+                            // set mBypassComposition once orientation change
+                            if (state.orientation != draw[i].orientation) {
+                                mBypassComposition = true;
+                            }
                             disp->setProjection(state.orientation,
-                                    state.viewport, state.frame);
-                        }
-
-                        // Walk through all the layers in currentLayers,
-                        // and update their transform hint.
-                        //
-                        // TODO: we could be much more clever about which
-                        // layers we touch and how often we do these updates
-                        // (e.g. only touch the layers associated with this
-                        // display, and only on a rotation).
-                        for (size_t i = 0; i < count; i++) {
-                            const sp<LayerBase>& layerBase = currentLayers[i];
-                            layerBase->updateTransformHint();
+                                    viewport, frame);
                         }
                     }
                 }
@@ -1208,6 +1262,61 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
         }
     }
 
+    if (transactionFlags & (eTraversalNeeded|eDisplayTransactionNeeded)) {
+        // The transform hint might have changed for some layers
+        // (either because a display has changed, or because a layer
+        // as changed).
+        //
+        // Walk through all the layers in currentLayers,
+        // and update their transform hint.
+        //
+        // If a layer is visible only on a single display, then that
+        // display is used to calculate the hint, otherwise we use the
+        // default display.
+        //
+        // NOTE: we do this here, rather than in rebuildLayerStacks() so that
+        // the hint is set before we acquire a buffer from the surface texture.
+        //
+        // NOTE: layer transactions have taken place already, so we use their
+        // drawing state. However, SurfaceFlinger's own transaction has not
+        // happened yet, so we must use the current state layer list
+        // (soon to become the drawing state list).
+        //
+        sp<const DisplayDevice> disp;
+        uint32_t currentlayerStack = 0;
+        for (size_t i=0; i<count; i++) {
+            // NOTE: we rely on the fact that layers are sorted by
+            // layerStack first (so we don't have to traverse the list
+            // of displays for every layer).
+            const sp<LayerBase>& layerBase(currentLayers[i]);
+            uint32_t layerStack = layerBase->drawingState().layerStack;
+            if (i==0 || currentlayerStack != layerStack) {
+                currentlayerStack = layerStack;
+                // figure out if this layerstack is mirrored
+                // (more than one display) if so, pick the default display,
+                // if not, pick the only display it's on.
+                disp.clear();
+                for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
+                    sp<const DisplayDevice> hw(mDisplays[dpy]);
+                    if (hw->getLayerStack() == currentlayerStack) {
+                        if (disp == NULL) {
+                            disp = hw;
+                        } else {
+                            disp = getDefaultDisplayDevice();
+                            break;
+                        }
+                    }
+                }
+            }
+            if (disp != NULL) {
+                // presumably this means this layer is using a layerStack
+                // that is not visible on any display
+                layerBase->updateTransformHint(disp);
+            }
+        }
+    }
+
+
     /*
      * Perform our own transaction if needed
      */
@@ -1256,6 +1365,115 @@ void SurfaceFlinger::commitTransaction()
     mTransactionPending = false;
     mAnimTransactionPending = false;
     mTransactionCV.broadcast();
+}
+
+int SurfaceFlinger::setDisplayScaling(uint32_t scale)
+{
+    Mutex::Autolock _l(mStateLock);
+    int32_t result = NO_ERROR;
+    sp<IBinder> token =
+        getBuiltInDisplay(DisplayDevice::DISPLAY_EXTERNAL);
+    ssize_t dpyIdx = mCurrentState.displays.indexOfKey(token);
+    if (dpyIdx < 0)
+        return BAD_VALUE;
+
+    DisplayDeviceState& disp(mCurrentState.displays.editValueAt(dpyIdx));
+    if (disp.isValid()) {
+         if (disp.scale != scale) {
+             mDisplayScaleState = scale;
+             disp.scale = mDisplayScaleState;
+             setTransactionFlags(eDisplayTransactionNeeded);
+         }
+    } else {
+        result = INVALID_OPERATION;
+    }
+    return result;
+}
+
+void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
+        Rect& viewport, Rect& frame)
+{
+    if (state.type == DisplayDevice::DISPLAY_EXTERNAL) {
+        uint32_t width;
+        uint32_t height;
+        HWComposer& hwc(getHwComposer());
+
+        if (!hwc.isConnected(state.type))
+            return;
+
+        width = hwc.getWidth(state.type);
+        height = hwc.getHeight(state.type);
+
+        switch (state.scaleMode) {
+        case eDisplayScaleFullscreen:
+            frame.left = frame.top = 0;
+            frame.right = width;
+            frame.bottom = height;
+            break;
+        case eDisplayScaleCenter:
+        {
+            int viewWidth;
+            int viewHeight;
+            bool isRot90_270;
+
+            isRot90_270 = (state.orientation == DisplayState::eOrientation90 ||
+                 state.orientation == DisplayState::eOrientation270);
+            if (isRot90_270) {
+                viewWidth = viewport.bottom - viewport.top;
+                viewHeight = viewport.right - viewport.left;
+            } else {
+                viewWidth = viewport.right - viewport.left;
+                viewHeight = viewport.bottom - viewport.top;
+            }
+
+            if (width < viewWidth) {
+                frame.left = 0;
+                frame.right = width;
+                if (isRot90_270) {
+                    viewport.top = 0;
+                    viewport.bottom = width;
+                } else {
+                    viewport.left = 0;
+                    viewport.right = width;
+                }
+            } else {
+                frame.left = (width - viewWidth) / 2;
+                frame.right = (width + viewWidth) / 2;
+            }
+
+            if (height < viewHeight) {
+                frame.top = 0;
+                frame.bottom = height;
+                if (isRot90_270) {
+                    viewport.left = 0;
+                    viewport.right = height;
+                } else {
+                    viewport.top = 0;
+                    viewport.bottom = height;
+                }
+            } else {
+                frame.top = (height - viewHeight) / 2;
+                frame.bottom = (height + viewHeight) / 2;
+            }
+            break;
+        }
+        case eDisplayScaleAspect:
+        case eDisplayScaleNone:
+        default:
+            break;
+        }
+
+        if (state.scaleStepX) {
+            int frameWidth = frame.right - frame.left;
+            frame.left += state.scaleStepX * frameWidth / 100;
+            frame.right -= state.scaleStepX * frameWidth / 100;
+        }
+        if (state.scaleStepY) {
+            int frameHeight = frame.bottom - frame.left;
+            frame.top += state.scaleStepY * frameHeight / 100;
+            frame.bottom -= state.scaleStepY * frameHeight / 100;
+        }
+    }
 }
 
 void SurfaceFlinger::computeVisibleRegions(
@@ -1533,6 +1751,7 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
     const Transform& tr = hw->getTransform();
     if (cur != end) {
         // we're using h/w composer
+        bool needDisableAnimation = false;
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<LayerBase>& layer(layers[i]);
             const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
@@ -1547,6 +1766,8 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
+                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
+                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
@@ -1562,6 +1783,9 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                 }
             }
             layer->setAcquireFence(hw, *cur);
+        }
+        if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+            mAnimFlag = needDisableAnimation ? false : true;
         }
     } else {
         // we're not using h/w composer
@@ -1618,11 +1842,19 @@ ssize_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
 
 status_t SurfaceFlinger::removeLayer(const sp<LayerBase>& layer)
 {
-    Mutex::Autolock _l(mStateLock);
-    status_t err = purgatorizeLayer_l(layer);
-    if (err == NO_ERROR)
-        setTransactionFlags(eTransactionNeeded);
-    return err;
+    if(alreadyLockedBySurfaceFlingerThread()){
+        ALOGW("mStateLock already locked by surfaceFlingerThread");
+        status_t err = purgatorizeLayer_l(layer);
+        if (err == NO_ERROR)
+           setTransactionFlags(eTransactionNeeded);
+       return err;
+    }else{
+        Mutex::Autolock _l(mStateLock);
+        status_t err = purgatorizeLayer_l(layer);
+        if (err == NO_ERROR)
+            setTransactionFlags(eTransactionNeeded);
+        return err;
+    }
 }
 
 status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase>& layerBase)
@@ -1695,6 +1927,18 @@ void SurfaceFlinger::setTransactionState(
                 break;
             }
         }
+    }
+
+    if (flags & eTransition) {
+        mTransitionOn = true;
+    } else {
+        mTransitionOn = false;
+    }
+
+    if (flags & eOrientationEnd) {
+        mOrientationEnd = true;
+    } else {
+        mOrientationEnd = false;
     }
 
     size_t count = displays.size();
@@ -2046,6 +2290,7 @@ void SurfaceFlinger::onScreenAcquired(const sp<const DisplayDevice>& hw) {
         }
     }
     mVisibleRegionsDirty = true;
+    mBypassComposition = false;
     repaintEverything();
 }
 
@@ -2414,6 +2659,7 @@ bool SurfaceFlinger::startDdmConnection()
 status_t SurfaceFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
     switch (code) {
         case CREATE_CONNECTION:
         case SET_TRANSACTION_STATE:
@@ -2505,12 +2751,47 @@ status_t SurfaceFlinger::onTransact(
                 reply->writeInt32(0);
                 reply->writeInt32(mDebugDisableHWC);
                 return NO_ERROR;
+            case 1011:  // SHOW_FRAME_COUNT
+                n = data.readInt32();
+                mDebugFrameCountFlag = n ? n : (mDebugFrameCountFlag ? 0 : 1);
+                mDebugFrameCount = 0;
+                mDebugFrameCountIncFlag = 0;
+                n = data.readInt32();
+                if (n > 0) {
+                   mDebugFrameCountXCoordinate = n;
+                }
+                   n = data.readInt32();
+                if (n > 0) {
+                   mDebugFrameCountYCoordinate = n;
+                }
+                if (mDebugFrameCountFlag) {
+                   hw->setFramecount(eEnableCursorDbg, 0,
+                   mDebugFrameCountXCoordinate, mDebugFrameCountYCoordinate);
+                } else {
+                   hw->setFramecount(eDisableCursorDbg, 0, 0, 0);
+                }
+                invalidateHwcGeometry();
+                repaintEverything();
+                return NO_ERROR;
+            case 1012:  // Get show frame count parameters
+                reply->writeInt32(mDebugFrameCountFlag);
+                reply->writeInt32(mDebugFrameCountXCoordinate);
+                reply->writeInt32(mDebugFrameCountYCoordinate);
+                return NO_ERROR;
+            case 1016:  // enable/disable frame count increase
+                n = data.readInt32();
+                mDebugFrameCountIncFlag = n;
+                return NO_ERROR;
             case 1013: {
                 Mutex::Autolock _l(mStateLock);
-                sp<const DisplayDevice> hw(getDefaultDisplayDevice());
                 reply->writeInt32(hw->getPageFlipCount());
             }
             return NO_ERROR;
+            case 1014: // setDisplayScaling
+                n = data.readInt32();
+                int32_t result = setDisplayScaling((uint32_t)n);
+                reply->writeInt32(result);
+                return NO_ERROR;
         }
     }
     return err;
@@ -2582,9 +2863,11 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(uint32_t layerStack,
     glLoadIdentity();
     const Vector< sp<LayerBase> >& layers(hw->getVisibleLayersSortedByZ());
     const size_t count = layers.size();
-    for (size_t i=0 ; i<count ; ++i) {
-        const sp<LayerBase>& layer(layers[i]);
-        layer->draw(hw);
+    if (mAnimFlag) {
+        for (size_t i=0 ; i<count ; ++i) {
+            const sp<LayerBase>& layer(layers[i]);
+            layer->draw(hw);
+        }
     }
 
     hw->compositionComplete();
@@ -2784,6 +3067,10 @@ status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display,
     return res;
 }
 
+bool SurfaceFlinger::isAnimationPermitted() {
+    return mAnimFlag;
+}
+
 // ---------------------------------------------------------------------------
 
 SurfaceFlinger::LayerVector::LayerVector() {
@@ -2820,7 +3107,7 @@ SurfaceFlinger::DisplayDeviceState::DisplayDeviceState()
 }
 
 SurfaceFlinger::DisplayDeviceState::DisplayDeviceState(DisplayDevice::DisplayType type)
-    : type(type), layerStack(0), orientation(0) {
+    : type(type), layerStack(0), orientation(0), scale(0) {
     viewport.makeInvalid();
     frame.makeInvalid();
 }

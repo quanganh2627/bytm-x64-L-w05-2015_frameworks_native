@@ -116,14 +116,20 @@ class Composer : public Singleton<Composer>
     SortedVector<DisplayState > mDisplayStates;
     uint32_t                    mForceSynchronous;
     bool                        mAnimation;
+    bool                        mTransition;
+    bool                        mOrientationEnd;
 
     Composer() : Singleton<Composer>(),
         mForceSynchronous(0),
-        mAnimation(false)
+        mAnimation(false),
+        mTransition(false),
+        mOrientationEnd(true)
     { }
 
     void closeGlobalTransactionImpl(bool synchronous);
     void setAnimationTransactionImpl();
+    void setTransitionTransactionImpl(bool on);
+    void setOrientationEndTransactionImpl(bool end);
 
     layer_state_t* getLayerStateLocked(
             const sp<SurfaceComposerClient>& client, SurfaceID id);
@@ -166,6 +172,14 @@ public:
         Composer::getInstance().setAnimationTransactionImpl();
     }
 
+    static void setTransitionTransaction(bool on) {
+        Composer::getInstance().setTransitionTransactionImpl(on);
+    }
+
+    static void setOrientationEndTransaction(bool end) {
+        Composer::getInstance().setOrientationEndTransactionImpl(end);
+    }
+
     static void closeGlobalTransaction(bool synchronous) {
         Composer::getInstance().closeGlobalTransactionImpl(synchronous);
     }
@@ -205,7 +219,12 @@ void Composer::closeGlobalTransactionImpl(bool synchronous) {
         if (mAnimation) {
             flags |= ISurfaceComposer::eAnimation;
         }
-
+        if (mTransition) {
+            flags |= ISurfaceComposer::eTransition;
+        }
+        if (mOrientationEnd) {
+            flags |= ISurfaceComposer::eOrientationEnd;
+        }
         mForceSynchronous = false;
         mAnimation = false;
     }
@@ -216,6 +235,16 @@ void Composer::closeGlobalTransactionImpl(bool synchronous) {
 void Composer::setAnimationTransactionImpl() {
     Mutex::Autolock _l(mLock);
     mAnimation = true;
+}
+
+void Composer::setTransitionTransactionImpl(bool on) {
+    Mutex::Autolock _l(mLock);
+    mTransition = on;
+}
+
+void Composer::setOrientationEndTransactionImpl(bool end) {
+    Mutex::Autolock _l(mLock);
+    mOrientationEnd = end;
 }
 
 layer_state_t* Composer::getLayerStateLocked(
@@ -494,6 +523,14 @@ void SurfaceComposerClient::setAnimationTransaction() {
     Composer::setAnimationTransaction();
 }
 
+void SurfaceComposerClient::setTransitionTransaction(bool on) {
+    Composer::setTransitionTransaction(on);
+}
+
+void SurfaceComposerClient::setOrientationEndTransaction(bool end) {
+    Composer::setOrientationEndTransaction(end);
+}
+
 // ----------------------------------------------------------------------------
 
 status_t SurfaceComposerClient::setCrop(SurfaceID id, const Rect& crop) {
@@ -583,6 +620,10 @@ void SurfaceComposerClient::unblankDisplay(const sp<IBinder>& token) {
     ComposerService::getComposerService()->unblank(token);
 }
 
+bool SurfaceComposerClient::isAnimationPermitted()
+{
+    return ComposerService::getComposerService()->isAnimationPermitted();
+}
 // ----------------------------------------------------------------------------
 
 ScreenshotClient::ScreenshotClient()

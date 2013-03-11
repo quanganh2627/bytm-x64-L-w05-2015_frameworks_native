@@ -50,6 +50,7 @@ class EventThread : public Thread {
         // count == 0 : one-shot event that has not fired
         // count ==-1 : one-shot event that fired this round / disabled
         int32_t count;
+        static nsecs_t s_oldestUnreponsedRequestTimestamp;
 
     private:
         virtual ~Connection();
@@ -59,6 +60,9 @@ class EventThread : public Thread {
         virtual void requestNextVsync();    // asynchronous
         sp<EventThread> const mEventThread;
         sp<BitTube> const mChannel;
+    public:
+        //added for debug
+        nsecs_t mLastRequestTimestamp;
     };
 
 public:
@@ -105,10 +109,13 @@ private:
     SortedVector< wp<Connection> > mDisplayEventConnections;
     Vector< DisplayEventReceiver::Event > mPendingEvents;
     DisplayEventReceiver::Event mVSyncEvent[HWC_DISPLAY_TYPES_SUPPORTED];
+    nsecs_t mLastVSyncTimestamp;
     bool mUseSoftwareVSync;
+    int mLastVSyncDisplayType;
 
     // for debugging
     bool mDebugVsyncEnabled;
+    bool mVsyncDisabled;
 };
 
 // ---------------------------------------------------------------------------
