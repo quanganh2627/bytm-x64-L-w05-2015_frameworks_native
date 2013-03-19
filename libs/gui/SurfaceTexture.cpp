@@ -684,13 +684,28 @@ nsecs_t SurfaceTexture::getTimestamp() {
 
 EGLImageKHR SurfaceTexture::createImage(EGLDisplay dpy,
         const sp<GraphicBuffer>& graphicBuffer) {
-    EGLClientBuffer cbuf = (EGLClientBuffer)graphicBuffer->getNativeBuffer();
+    EGLClientBuffer cbuf;
     EGLint attrs[] = {
         EGL_IMAGE_PRESERVED_KHR,    EGL_TRUE,
         EGL_NONE,
     };
-    EGLImageKHR image = eglCreateImageKHR(dpy, EGL_NO_CONTEXT,
-            EGL_NATIVE_BUFFER_ANDROID, cbuf, attrs);
+    EGLImageKHR image;
+
+    if (graphicBuffer == NULL)
+    {
+        ST_LOGV("graphicBuffer is NULL");
+        return EGL_NO_IMAGE_KHR;
+    }
+
+    cbuf = (EGLClientBuffer)graphicBuffer->getNativeBuffer();
+    if (cbuf == NULL)
+    {
+        ST_LOGV("cbuf is NULL");
+        return EGL_NO_IMAGE_KHR;
+    }
+
+    image = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
+	                          cbuf, attrs);
     if (image == EGL_NO_IMAGE_KHR) {
         EGLint error = eglGetError();
         ST_LOGE("error creating EGLImage: %#x", error);
