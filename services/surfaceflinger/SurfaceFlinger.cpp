@@ -552,7 +552,7 @@ status_t SurfaceFlinger::readyToRun()
 }
 
 int32_t SurfaceFlinger::allocateHwcDisplayId(DisplayDevice::DisplayType type) {
-    return (uint32_t(type) < DisplayDevice::NUM_DISPLAY_TYPES) ?
+    return (uint32_t(type) <= DisplayDevice::DISPLAY_VIRTUAL) ?
             type : mHwc->allocateDisplayId();
 }
 

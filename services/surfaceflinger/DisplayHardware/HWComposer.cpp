@@ -129,7 +129,7 @@ HWComposer::HWComposer(
     }
 
     // these display IDs are always reserved
-    for (size_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
+    for (size_t i=0 ; i<MAX_DISPLAYS ; i++) {
         mAllocatedDisplayIDs.markBit(i);
     }
 
@@ -694,7 +694,7 @@ status_t HWComposer::acquire(int disp) {
 
 void HWComposer::disconnectDisplay(int disp) {
     LOG_ALWAYS_FATAL_IF(disp < 0 || disp == HWC_DISPLAY_PRIMARY);
-    if (disp >= HWC_NUM_DISPLAY_TYPES) {
+    if (disp >= MAX_DISPLAYS) {
         // nothing to do for these yet
         return;
     }
