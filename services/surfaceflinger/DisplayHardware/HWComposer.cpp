@@ -535,6 +535,8 @@ status_t HWComposer::createWorkList(int32_t id, size_t numLayers) {
         disp.list->retireFenceFd = -1;
         disp.list->flags = HWC_GEOMETRY_CHANGED;
         disp.list->numHwLayers = numLayers;
+        if (!mFlinger->queryRotationIsFinished())
+            disp.list->flags |= HWC_ROTATION_IN_PROGRESS;
     }
     return NO_ERROR;
 }

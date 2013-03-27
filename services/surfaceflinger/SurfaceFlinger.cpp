@@ -989,6 +989,12 @@ void SurfaceFlinger::setUpHWComposer() {
     }
 }
 
+bool SurfaceFlinger::queryRotationIsFinished() {
+    Mutex::Autolock _l(mStateLock);
+
+    return mOrientationEnd;
+}
+
 void SurfaceFlinger::doComposition() {
     ATRACE_CALL();
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);

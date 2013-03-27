@@ -121,6 +121,9 @@ public:
     // TODO: this should be made accessible only to HWComposer
     const Vector< sp<Layer> >& getLayerSortedByZForHwcDisplay(int id);
 
+    // to query if the rotation is finished, the rotation info
+    // is updated by WindowManager
+    bool queryRotationIsFinished();
 private:
     friend class Client;
     friend class DisplayEventConnection;
