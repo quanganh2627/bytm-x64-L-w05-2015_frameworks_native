@@ -93,7 +93,17 @@ void EventThread::setVsyncRate(uint32_t count,
 void EventThread::requestNextVsync(
         const sp<EventThread::Connection>& connection) {
     Mutex::Autolock _l(mLock);
-    if (connection->count < 0) {
+    DisplayEventReceiver::Event event;
+    if ((!mVsyncDisabled) && (connection->mLastConsumeTimestamp < mLastVSyncTimestamp)) {
+        connection->mLastRequestTimestamp = systemTime(CLOCK_MONOTONIC);
+        connection->mLastConsumeTimestamp = mLastVSyncTimestamp;
+        event.header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
+        event.header.id = mLastVSyncDisplayType;
+        event.header.timestamp = connection->mLastRequestTimestamp;
+        event.vsync.count = mVSyncEvent[mLastVSyncDisplayType].vsync.count;
+        connection->postEvent(event);
+        enableVSyncLocked();
+    } else if (connection->count < 0) {
         connection->count = 0;
         connection->mLastRequestTimestamp = systemTime(CLOCK_MONOTONIC);
         if(Connection::s_oldestUnreponsedRequestTimestamp == 0) {
@@ -172,6 +182,9 @@ bool EventThread::threadLoop() {
         const sp<Connection>& conn(signalConnections[i]);
         // now see if we still need to report this event
         status_t err = conn->postEvent(event);
+        if (conn->count >= 0) {
+            conn->mLastConsumeTimestamp = mLastVSyncTimestamp;
+        }
         if (err == -EAGAIN || err == -EWOULDBLOCK) {
             // The destination doesn't accept events anymore, it's probably
             // full. For now, we just drop the events on the floor.
@@ -211,7 +224,9 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
             if (timestamp) {
                 // we have a vsync event to dispatch
                 currentVSyncTimestamp = timestamp;
+                mLastVSyncTimestamp = currentVSyncTimestamp;
                 currentVSyncDisplayType = i;
+                mLastVSyncDisplayType = currentVSyncDisplayType;
                 *event = mVSyncEvent[i];
                 mVSyncEvent[i].header.timestamp = 0;
                 vsyncCount = mVSyncEvent[i].vsync.count;
@@ -323,8 +338,6 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
         }
     } while (signalConnections.isEmpty());
 
-    mLastVSyncTimestamp = currentVSyncTimestamp;
-    mLastVSyncDisplayType = currentVSyncDisplayType;
 
 
     //take care are only single shot request mode
@@ -386,7 +399,7 @@ nsecs_t EventThread::Connection::s_oldestUnreponsedRequestTimestamp = 0;
 
 EventThread::Connection::Connection(
         const sp<EventThread>& eventThread)
-    : count(-1), mEventThread(eventThread), mChannel(new BitTube()), mLastRequestTimestamp(0)
+    : count(-1), mLastConsumeTimestamp(0), mEventThread(eventThread), mChannel(new BitTube()), mLastRequestTimestamp(0)
 {
 }
 
