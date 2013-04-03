@@ -39,11 +39,10 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog
 
 ifeq ($(ENABLE_IMG_GRAPHICS),true)
-ifeq ($(strip $(BOARD_USES_WRS_OMXIL_CORE)),true)
     LOCAL_C_INCLUDES += \
-        $(TARGET_OUT_HEADERS)/pvr/hal
+		$(TARGET_OUT_HEADERS)/pvr/hal \
+		$(TOP)/frameworks/native/include/media/openmax
 	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
-endif
 endif
 
 LOCAL_MODULE:= libgui
