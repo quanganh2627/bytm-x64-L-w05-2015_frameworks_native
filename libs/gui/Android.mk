@@ -38,7 +38,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ENABLE_IMG_GRAPHICS), true)
 ifneq ($(ENABLE_MRFL_GRAPHICS),true)
-	LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/pvr/hal
+	LOCAL_C_INCLUDES += \
+            $(TARGET_OUT_HEADERS)/pvr/hal \
+            $(TARGET_OUT_HEADERS)/khronos/openmax
 	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
 endif
 endif

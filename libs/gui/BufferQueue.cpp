@@ -33,6 +33,7 @@
 #include <utils/Trace.h>
 #ifdef USE_IMG_GRAPHICS
 #include <hal_public.h>
+#include <OMX_IVCommon.h>
 #endif
 
 // Macros for including the BufferQueue name in log messages
@@ -553,11 +554,20 @@ status_t BufferQueue::queueBuffer(int buf,
             // be consumed.
             listener = mConsumerListener;
         } else {
-            bool usePureAsyncMode = true;
-            if (mConnectedApi == NATIVE_WINDOW_API_MEDIA)
-                usePureAsyncMode = false;
-            if (!usePureAsyncMode) {
-                // Here we couldn't use a pure asynchronous mode for video playback,
+            bool useOriginalAsyncMode = true;
+#ifdef USE_IMG_GRAPHICS
+            //Only for HW decoder format
+            if (mConnectedApi == NATIVE_WINDOW_API_MEDIA &&
+                    mSlots[buf].mGraphicBuffer->handle != NULL) {
+                IMG_native_handle_t *nativeBuffer =
+                    (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
+                if (nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar ||
+                        nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled)
+                    useOriginalAsyncMode = false;
+            }
+#endif
+            if (!useOriginalAsyncMode) {
+                // Here we couldn't use original asynchronous mode for video playback,
                 // because there is a timing sequence issue between
                 // video queue buffer and SurfaceFlinger's vsync.
                 // Video render is different with GUI,
@@ -567,9 +577,6 @@ status_t BufferQueue::queueBuffer(int buf,
                 if (mQueue.size() <= 1) {
                     mQueue.push_back(buf);
 
-                    // Asynchronous mode only signals that a frame should be
-                    // consumed if no previous frame was pending. If a frame were
-                    // pending then the consumer would have already been notified.
                     listener = mConsumerListener;
                 } else {
                     // clear all queued buffers
