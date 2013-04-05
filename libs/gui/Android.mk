@@ -36,6 +36,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libui \
 	libutils \
 
+ifeq ($(ENABLE_IMG_GRAPHICS), true)
+ifneq ($(ENABLE_MRFL_GRAPHICS),true)
+	LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/pvr/hal
+	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
+endif
+endif
 
 LOCAL_MODULE:= libgui
 

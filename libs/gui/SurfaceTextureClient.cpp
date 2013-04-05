@@ -290,6 +290,12 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer, int fence
         return i;
     }
 
+    // Put a special flag if the buffer
+    uint32_t privateFlag = 0;
+    if (buffer->usage & GRALLOC_USAGE_PRIVATE_2) {
+        buffer->usage &= ~GRALLOC_USAGE_PRIVATE_2;
+        privateFlag = 1 << 31;
+    }
 
     // Make sure the crop rectangle is entirely inside the buffer.
     Rect crop;
@@ -297,7 +303,7 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer, int fence
 
     sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : NULL);
     ISurfaceTexture::QueueBufferOutput output;
-    ISurfaceTexture::QueueBufferInput input(timestamp, crop, mScalingMode,
+    ISurfaceTexture::QueueBufferInput input(timestamp, crop, mScalingMode | privateFlag,
             mTransform, fence);
     status_t err = mSurfaceTexture->queueBuffer(i, input, &output);
     if (err != OK)  {
