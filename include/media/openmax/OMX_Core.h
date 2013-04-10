@@ -409,7 +409,17 @@ typedef struct OMX_PARAM_COMPONENTROLETYPE {
  */
 #define OMX_BUFFERFLAG_CODECCONFIG 0x00000080
 
+/* interlaced frame flag: This flag is set to indicate the buffer contains a 
+ * top and bottom field and display ordering is top field first.
+ * @ingroup buf
+ */
+#define OMX_BUFFERFLAG_TFF 0x00010000
 
+/* interlaced frame flag: This flag is set to indicate the buffer contains a 
+ * top and bottom field and display ordering is bottom field first.
+ * @ingroup buf
+ */
+#define OMX_BUFFERFLAG_BFF 0x00020000
 
 /** @ingroup buf */
 typedef struct OMX_BUFFERHEADERTYPE
