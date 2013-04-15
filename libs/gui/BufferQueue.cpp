@@ -36,6 +36,9 @@
 #include <hal_public.h>
 #endif
 
+static const nsecs_t dequeueTimeout = seconds(5);
+
+
 // Macros for including the BufferQueue name in log messages
 #define ST_LOGV(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 #define ST_LOGD(x, ...) ALOGD("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
@@ -355,7 +358,10 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
             // the max buffer count to change.
             tryAgain = found == INVALID_BUFFER_SLOT;
             if (tryAgain) {
-                mDequeueCondition.wait(mMutex);
+                if (mDequeueCondition.waitRelative(mMutex, dequeueTimeout)) {
+                    ST_LOGE("dequeueBuffer: time out and will free all buffer!");
+                    freeAllBuffersLocked();
+                }
             }
         }
 
