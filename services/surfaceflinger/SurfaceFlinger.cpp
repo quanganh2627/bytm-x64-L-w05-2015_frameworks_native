@@ -1373,6 +1373,25 @@ void SurfaceFlinger::commitTransaction()
     mTransactionCV.broadcast();
 }
 
+
+bool SurfaceFlinger::isPresentationMode()
+{
+    Mutex::Autolock _l(mStateLock);
+     //if have more than one displayDevice and whose layerStack > 0
+     //we are in presentation mode
+     for (size_t dpy = 0 ; dpy < mDisplays.size() ; dpy++) {
+        const sp<const DisplayDevice>& hw(mDisplays[dpy]);
+        ALOGI("Device %s -> ls %d ", hw->getDisplayName().string(), hw->getLayerStack());
+        if (hw->getLayerStack() > 0) {
+            return true;
+        }
+     }
+
+     return false;
+
+
+}
+
 int SurfaceFlinger::setDisplayScaling(uint32_t scale)
 {
     Mutex::Autolock _l(mStateLock);
@@ -2670,6 +2689,13 @@ status_t SurfaceFlinger::onTransact(
                 return PERMISSION_DENIED;
             }
             break;
+        }
+         case 1015: //isPresentationMode
+        {
+             bool r = isPresentationMode();
+             ALOGI("is presetation mode %d" , r);
+             reply->writeInt32(r ? 1 : 0);
+             return NO_ERROR;
         }
     }
 

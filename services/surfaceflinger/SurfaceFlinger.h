@@ -258,6 +258,7 @@ private:
 
     // setDisplayScaling: binder transcation for display scaling
     int setDisplayScaling(uint32_t scale);
+    bool isPresentationMode();
 
     // handleDisplayScaling: calculate the scaled frame rect.
     void handleDisplayScaling(const DisplayDeviceState& state,
