@@ -169,6 +169,9 @@ public:
     // synchronous mode.
     bool isSynchronousMode() const;
 
+    // getTrickMode returns whether video is in trick playback
+    bool getTrickMode() const;
+
     // set the name of the SurfaceTexture that will be used to identify it in
     // log messages.
     void setName(const String8& name);
@@ -396,6 +399,10 @@ private:
     // It is set to false by detachFromContext, and then set to true again by
     // attachToContext.
     bool mAttached;
+
+    // mTrickMode indicates whether the current surface is used for trick
+    // playback.
+    bool mTrickMode;
 };
 
 // ----------------------------------------------------------------------------

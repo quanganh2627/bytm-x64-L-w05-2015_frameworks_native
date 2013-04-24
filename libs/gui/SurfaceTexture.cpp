@@ -129,7 +129,8 @@ SurfaceTexture::SurfaceTexture(GLuint tex, bool allowSynchronousMode,
     mEglDisplay(EGL_NO_DISPLAY),
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
-    mAttached(true)
+    mAttached(true),
+    mTrickMode(false)
 {
     ST_LOGV("SurfaceTexture");
 
@@ -303,6 +304,7 @@ status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter, bool skipSync)
         mCurrentScalingMode = item.mScalingMode;
         mCurrentTimestamp = item.mTimestamp;
         mCurrentFence = item.mFence;
+        mTrickMode = item.mTrickMode;
         if (!skipSync) {
             // SurfaceFlinger needs to lazily perform GLES synchronization
             // only when it's actually going to use GLES for compositing.
@@ -767,6 +769,11 @@ uint32_t SurfaceTexture::getCurrentScalingMode() const {
 sp<Fence> SurfaceTexture::getCurrentFence() const {
     Mutex::Autolock lock(mMutex);
     return mCurrentFence;
+}
+
+bool SurfaceTexture::getTrickMode() const {
+    Mutex::Autolock lock(mMutex);
+    return mTrickMode;
 }
 
 status_t SurfaceTexture::doGLFenceWait() const {
