@@ -602,6 +602,7 @@ status_t BufferQueue::queueBuffer(int buf,
         mSlots[buf].mCrop = crop;
         mSlots[buf].mTransform = transform;
         mSlots[buf].mFence = fence;
+        mSlots[buf].mTrickMode = privateFlag;
 
         switch (scalingMode) {
             case NATIVE_WINDOW_SCALING_MODE_FREEZE:
@@ -889,11 +890,13 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         buffer->mTimestamp = mSlots[buf].mTimestamp;
         buffer->mBuf = buf;
         buffer->mFence = mSlots[buf].mFence;
+        buffer->mTrickMode = mSlots[buf].mTrickMode;
 
         mSlots[buf].mAcquireCalled = true;
         mSlots[buf].mNeedsCleanupOnRelease = false;
         mSlots[buf].mBufferState = BufferSlot::ACQUIRED;
         mSlots[buf].mFence = Fence::NO_FENCE;
+        mSlots[buf].mTrickMode = false;
 
         mQueue.erase(front);
         mDequeueCondition.broadcast();

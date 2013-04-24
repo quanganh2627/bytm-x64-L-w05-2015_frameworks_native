@@ -94,7 +94,8 @@ GLConsumer::GLConsumer(GLuint tex, bool allowSynchronousMode,
     mEglDisplay(EGL_NO_DISPLAY),
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
-    mAttached(true)
+    mAttached(true),
+    mTrickMode(false)
 {
     ST_LOGV("GLConsumer");
 
@@ -271,6 +272,7 @@ status_t GLConsumer::releaseAndUpdateLocked(const BufferQueue::BufferItem& item)
     mCurrentScalingMode = item.mScalingMode;
     mCurrentTimestamp = item.mTimestamp;
     mCurrentFence = item.mFence;
+    mTrickMode = item.mTrickMode;
 
     computeCurrentTransformMatrixLocked();
 
@@ -777,6 +779,12 @@ status_t GLConsumer::doGLFenceWait() const {
     Mutex::Autolock lock(mMutex);
     return doGLFenceWaitLocked();
 }
+
+bool GLConsumer::getTrickMode() const {
+    Mutex::Autolock lock(mMutex);
+    return mTrickMode;
+}
+
 
 status_t GLConsumer::doGLFenceWaitLocked() const {
 

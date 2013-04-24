@@ -882,6 +882,13 @@ public:
             getLayer()->flags &= ~HWC_SKIP_LAYER;
         }
     }
+    virtual void setTrickMode(bool on) {
+        if (on) {
+            getLayer()->flags |= HWC_TRICK_MODE;
+        } else {
+            getLayer()->flags &= ~HWC_TRICK_MODE;
+        }
+    }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;
     }

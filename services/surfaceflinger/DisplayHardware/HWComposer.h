@@ -155,6 +155,7 @@ public:
         virtual sp<Fence> getAndResetReleaseFence() = 0;
         virtual void setDefaultState() = 0;
         virtual void setSkip(bool skip) = 0;
+        virtual void setTrickMode(bool on) = 0;
         virtual void setBlending(uint32_t blending) = 0;
         virtual void setTransform(uint32_t transform) = 0;
         virtual void setFrame(const Rect& frame) = 0;

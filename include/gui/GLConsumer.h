@@ -187,6 +187,10 @@ public:
     // log messages.
     void setName(const String8& name);
 
+    // getTrickMode returns whether video is in trick playback
+    bool getTrickMode() const;
+
+
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
     status_t setDefaultBufferFormat(uint32_t defaultFormat);
@@ -421,6 +425,10 @@ private:
     // It is set to false by detachFromContext, and then set to true again by
     // attachToContext.
     bool mAttached;
+
+    // mTrickMode indicates whether the current surface is used for trick
+    // playback.
+    bool mTrickMode;
 };
 
 // ----------------------------------------------------------------------------

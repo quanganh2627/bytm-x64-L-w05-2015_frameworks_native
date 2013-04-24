@@ -240,6 +240,7 @@ public:
            mScalingMode(NATIVE_WINDOW_SCALING_MODE_FREEZE),
            mTimestamp(0),
            mFrameNumber(0),
+           mTrickMode(false),
            mBuf(INVALID_BUFFER_SLOT) {
              mCrop.makeInvalid();
         }
@@ -269,6 +270,9 @@ public:
 
         // mFence is a fence that will signal when the buffer is idle.
         sp<Fence> mFence;
+
+        // Indicates whether this buffer is used for trick mode
+        bool mTrickMode;
     };
 
     // The following public functions are the consumer-facing interface
@@ -422,6 +426,7 @@ private:
           mFrameNumber(0),
           mEglFence(EGL_NO_SYNC_KHR),
           mAcquireCalled(false),
+          mTrickMode(false),
           mNeedsCleanupOnRelease(false) {
             mCrop.makeInvalid();
         }
@@ -527,6 +532,9 @@ private:
         // consumer.  This is set when a buffer in ACQUIRED state is freed.
         // It causes releaseBuffer to return STALE_BUFFER_SLOT.
         bool mNeedsCleanupOnRelease;
+
+        // Indicates whether this buffer is used for trick mode
+        bool mTrickMode;
     };
 
     // mSlots is the array of buffer slots that must be mirrored on the
