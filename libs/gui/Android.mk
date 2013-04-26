@@ -55,7 +55,8 @@ ifeq ($(TARGET_BOARD_PLATFORM), tegra3)
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
-LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
 endif
 
 # for VPP support on MRFLD only
