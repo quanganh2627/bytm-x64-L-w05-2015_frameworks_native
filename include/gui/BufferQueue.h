@@ -184,7 +184,8 @@ public:
            mScalingMode(NATIVE_WINDOW_SCALING_MODE_FREEZE),
            mTimestamp(0),
            mFrameNumber(0),
-           mBuf(INVALID_BUFFER_SLOT) {
+           mBuf(INVALID_BUFFER_SLOT),
+           mTrickMode(false) {
              mCrop.makeInvalid();
          }
         // mGraphicBuffer points to the buffer allocated for this slot or is NULL
@@ -212,6 +213,9 @@ public:
 
         // mFence is a fence that will signal when the buffer is idle.
         sp<Fence> mFence;
+
+        // Indicates whether this buffer is used for trick mode
+        bool mTrickMode;
     };
 
     // The following public functions is the consumer facing interface
@@ -348,7 +352,8 @@ private:
           mFrameNumber(0),
           mEglFence(EGL_NO_SYNC_KHR),
           mAcquireCalled(false),
-          mNeedsCleanupOnRelease(false) {
+          mNeedsCleanupOnRelease(false),
+          mTrickMode(false) {
             mCrop.makeInvalid();
         }
 
@@ -443,6 +448,9 @@ private:
 
         // Indicates whether this buffer needs to be cleaned up by consumer
         bool mNeedsCleanupOnRelease;
+
+        // Indicates whether this buffer is used for trick mode
+        bool mTrickMode;
     };
 
     // mSlots is the array of buffer slots that must be mirrored on the client
