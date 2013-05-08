@@ -738,14 +738,8 @@ int HWComposer::fbPost(int32_t id,
 }
 
 int HWComposer::fbCompositionComplete() {
-    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
-       if (mHwc->reserved_proc[0]) {
-            int (*compositionComplete)(struct hwc_composer_device_1*, int) =
-                (int (*)(hwc_composer_device_1*, int))mHwc->reserved_proc[0];
-            compositionComplete(mHwc, 0);
-        }
+    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1))
         return NO_ERROR;
-    }
 
     if (mFbDev->compositionComplete) {
         return mFbDev->compositionComplete(mFbDev);
