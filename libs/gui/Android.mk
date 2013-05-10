@@ -66,6 +66,10 @@ ifeq ($(TARGET_BOARD_PLATFORM), msm8960)
 	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
+LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+endif
+
 # for VPP support on MRFLD only
 ifeq ($(TARGET_HAS_VPP),true)
     LOCAL_CFLAGS += -DGFX_BUF_EXT

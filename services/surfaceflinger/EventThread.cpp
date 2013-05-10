@@ -45,12 +45,19 @@ EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
       mDebugVsyncEnabled(false),
       mVsyncDisabled(false){
 
+      cpu_set_t cpuset;
+
     for (int32_t i=0 ; i<HWC_DISPLAY_TYPES_SUPPORTED ; i++) {
         mVSyncEvent[i].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
         mVSyncEvent[i].header.id = 0;
         mVSyncEvent[i].header.timestamp = 0;
         mVSyncEvent[i].vsync.count =  0;
     }
+    // set affinity on core 1 (cpu0 or cpu1), othogonal to GLThread on core 2 (cpu2 or cpu3)
+    CPU_ZERO(&cpuset);
+    CPU_SET(0, &cpuset);
+    CPU_SET(1, &cpuset);
+    sched_setaffinity(gettid(), sizeof(cpuset), &cpuset);
 }
 
 void EventThread::onFirstRef() {
