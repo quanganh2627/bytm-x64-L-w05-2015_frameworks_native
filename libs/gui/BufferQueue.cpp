@@ -1099,7 +1099,7 @@ status_t BufferQueue::consumerDisconnect() {
     return NO_ERROR;
 }
 
-status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
+status_t BufferQueue::getReleasedBuffers(uint64_t* slotMask) {
     ST_LOGV("getReleasedBuffers");
     Mutex::Autolock lock(mMutex);
 
@@ -1108,10 +1108,10 @@ status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
         return NO_INIT;
     }
 
-    uint32_t mask = 0;
+    uint64_t mask = 0;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
         if (!mSlots[i].mAcquireCalled) {
-            mask |= 1 << i;
+            mask |= (1ULL << i);
         }
     }
 

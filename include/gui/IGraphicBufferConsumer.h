@@ -153,7 +153,7 @@ public:
     // but have not yet been released by the consumer.
     //
     // This should be called from the onBuffersReleased() callback.
-    virtual status_t getReleasedBuffers(uint32_t* slotMask) = 0;
+    virtual status_t getReleasedBuffers(uint64_t* slotMask) = 0;
 
     // setDefaultBufferSize is used to set the size of buffers returned by
     // dequeueBuffer when a width and height of zero is requested.  Default
