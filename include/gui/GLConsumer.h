@@ -89,6 +89,8 @@ public:
             GLenum texTarget = GL_TEXTURE_EXTERNAL_OES, bool useFenceSync = true,
             const sp<BufferQueue> &bufferQueue = 0);
 
+    virtual ~GLConsumer();
+
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
     //
