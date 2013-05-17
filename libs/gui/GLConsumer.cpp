@@ -143,6 +143,11 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
     mConsumer->setConsumerUsageBits(DEFAULT_USAGE_FLAGS);
 }
 
+GLConsumer::~GLConsumer() {
+    ST_LOGV("~GLConsumer");
+    abandon();
+}
+
 status_t GLConsumer::setDefaultMaxBufferCount(int bufferCount) {
     Mutex::Autolock lock(mMutex);
     return mConsumer->setDefaultMaxBufferCount(bufferCount);
