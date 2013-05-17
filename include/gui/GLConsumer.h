@@ -85,6 +85,8 @@ public:
             uint32_t tex, uint32_t texureTarget = TEXTURE_EXTERNAL,
             bool useFenceSync = true, bool isControlledByApp = false);
 
+    virtual ~GLConsumer();
+
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
     //
