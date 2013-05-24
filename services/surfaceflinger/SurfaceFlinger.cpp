@@ -2878,6 +2878,19 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(uint32_t layerStack,
 
     hw->compositionComplete();
 
+    // Insert egl sync to flush FBO rendering. If it failed, only raise a
+    // warning message but not return false.
+    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    EGLSyncKHR fence = eglCreateSyncKHR(display, EGL_SYNC_FENCE_KHR, NULL);
+    if (fence != EGL_NO_SYNC_KHR) {
+        EGLint result = eglClientWaitSyncKHR(display, fence,
+                EGL_SYNC_FLUSH_COMMANDS_BIT_KHR, 1000000000);
+        if (result == EGL_FALSE)
+            ALOGW("renderScreenToTextureLocked: error waiting for previous "
+                  "fence: %#x", eglGetError());
+        eglDestroySyncKHR(display, fence);
+    }
+
     // back to main framebuffer
     glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
     glDeleteFramebuffersOES(1, &name);

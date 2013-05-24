@@ -257,7 +257,7 @@ public:
     // getReleasedBuffers sets the value pointed to by slotMask to a bit mask
     // indicating which buffer slots the have been released by the BufferQueue
     // but have not yet been released by the consumer.
-    status_t getReleasedBuffers(uint32_t* slotMask);
+    status_t getReleasedBuffers(uint64_t* slotMask);
 
     // setDefaultBufferSize is used to set the size of buffers returned by
     // requestBuffers when a with and height of zero is requested.
