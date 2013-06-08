@@ -1042,13 +1042,17 @@ status_t BufferQueue::setMaxAcquiredBufferCount(int maxAcquiredBuffers) {
 
 void BufferQueue::freeAllBuffersExceptHeadLocked() {
     int head = -1;
+    int head2 = -1;
     if (!mQueue.empty()) {
         Fifo::iterator front(mQueue.begin());
         head = *front;
+	if (mQueue.size() > 1){
+		head2 = *(++front);
+	}
     }
     mBufferHasBeenQueued = false;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (i != head) {
+        if (i != head && i != head2) {
             freeBufferLocked(i);
         }
     }
