@@ -95,6 +95,9 @@ public:
         // Indicates this buffer must be transformed by the inverse transform of the screen
         // it is displayed onto. This is applied after mTransform.
         bool mTransformToDisplayInverse;
+
+        // Indicate current video session ID
+        uint32_t mVideoSessionID;
     };
 
 
