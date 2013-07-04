@@ -95,7 +95,8 @@ GLConsumer::GLConsumer(GLuint tex, bool allowSynchronousMode,
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
     mAttached(true),
-    mTrickMode(false)
+    mTrickMode(false),
+    mVideoSessionID(0)
 {
     ST_LOGV("GLConsumer");
 
@@ -273,6 +274,7 @@ status_t GLConsumer::releaseAndUpdateLocked(const BufferQueue::BufferItem& item)
     mCurrentTimestamp = item.mTimestamp;
     mCurrentFence = item.mFence;
     mTrickMode = item.mTrickMode;
+    mVideoSessionID = item.mVideoSessionID;
 
     computeCurrentTransformMatrixLocked();
 
@@ -785,6 +787,10 @@ bool GLConsumer::getTrickMode() const {
     return mTrickMode;
 }
 
+uint32_t GLConsumer::getVideoSessionID() const {
+    Mutex::Autolock lock(mMutex);
+    return mVideoSessionID;
+}
 
 status_t GLConsumer::doGLFenceWaitLocked() const {
 

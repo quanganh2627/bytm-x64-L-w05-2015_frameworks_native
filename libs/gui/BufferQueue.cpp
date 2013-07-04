@@ -491,9 +491,16 @@ status_t BufferQueue::queueBuffer(int buf,
 
     input.deflate(&timestamp, &crop, &scalingMode, &transform, &fence);
     bool privateFlag = false;
-    if (scalingMode & (1 << 31)) {
-        scalingMode &= ~(1 << 31);
+    if (scalingMode & (1 << 30)) {
+        scalingMode &= ~(1 << 30);
         privateFlag = true;
+    }
+    uint32_t sessionId = 0;
+    if (scalingMode & (1 << 29)) {
+        sessionId = (1 << 29);
+        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
+        scalingMode &= ~(1 << 29);
+        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
     }
 
     if (fence == NULL) {
@@ -603,6 +610,7 @@ status_t BufferQueue::queueBuffer(int buf,
         mSlots[buf].mTransform = transform;
         mSlots[buf].mFence = fence;
         mSlots[buf].mTrickMode = privateFlag;
+        mSlots[buf].mVideoSessionID = sessionId;
 
         switch (scalingMode) {
             case NATIVE_WINDOW_SCALING_MODE_FREEZE:
@@ -891,12 +899,14 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         buffer->mBuf = buf;
         buffer->mFence = mSlots[buf].mFence;
         buffer->mTrickMode = mSlots[buf].mTrickMode;
+        buffer->mVideoSessionID = mSlots[buf].mVideoSessionID;
 
         mSlots[buf].mAcquireCalled = true;
         mSlots[buf].mNeedsCleanupOnRelease = false;
         mSlots[buf].mBufferState = BufferSlot::ACQUIRED;
         mSlots[buf].mFence = Fence::NO_FENCE;
         mSlots[buf].mTrickMode = false;
+        mSlots[buf].mVideoSessionID = 0;
 
         mQueue.erase(front);
         mDequeueCondition.broadcast();

@@ -190,6 +190,8 @@ public:
     // getTrickMode returns whether video is in trick playback
     bool getTrickMode() const;
 
+    // getVideoSessionID returns video session ID
+    uint32_t getVideoSessionID() const;
 
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
@@ -429,6 +431,9 @@ private:
     // mTrickMode indicates whether the current surface is used for trick
     // playback.
     bool mTrickMode;
+
+    // mVideoSessionID indicates video session ID
+    uint32_t mVideoSessionID;
 };
 
 // ----------------------------------------------------------------------------

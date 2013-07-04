@@ -246,7 +246,8 @@ public:
            mTimestamp(0),
            mFrameNumber(0),
            mTrickMode(false),
-           mBuf(INVALID_BUFFER_SLOT) {
+           mBuf(INVALID_BUFFER_SLOT),
+           mVideoSessionID(0) {
              mCrop.makeInvalid();
         }
         // mGraphicBuffer points to the buffer allocated for this slot, or is NULL
@@ -278,6 +279,9 @@ public:
 
         // Indicates whether this buffer is used for trick mode
         bool mTrickMode;
+
+        // Indicate current video session ID
+        uint32_t mVideoSessionID;
     };
 
     // The following public functions are the consumer-facing interface
@@ -432,7 +436,8 @@ private:
           mEglFence(EGL_NO_SYNC_KHR),
           mAcquireCalled(false),
           mTrickMode(false),
-          mNeedsCleanupOnRelease(false) {
+          mNeedsCleanupOnRelease(false),
+          mVideoSessionID(0) {
             mCrop.makeInvalid();
         }
 
@@ -501,6 +506,12 @@ private:
 
         // mScalingMode is the current scaling mode for this buffer slot.
         // (example: NATIVE_WINDOW_SCALING_MODE_FREEZE)
+        // refer the definition in system/core/include/system/window.h
+        // FIXME: This variable is reused by MDS(HDMI middleware) to pass video sessionID
+        // Original usage only use low 2 bits, MDS reuse it like this:
+        // Bit 30: trcik mode (HDMI timing seeking)
+        // Bit 29: has video session ID?
+        // Bit 24 ~ 27: video session ID
         uint32_t mScalingMode;
 
         // mTimestamp is the current timestamp for this buffer slot. This gets
@@ -540,6 +551,9 @@ private:
 
         // Indicates whether this buffer is used for trick mode
         bool mTrickMode;
+
+        // Indicate current video session ID
+        uint32_t mVideoSessionID;
     };
 
     // mSlots is the array of buffer slots that must be mirrored on the
