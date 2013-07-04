@@ -289,6 +289,7 @@ void Layer::setPerFrameData(const sp<const DisplayDevice>& hw,
     layer.setBuffer(mActiveBuffer);
 
     layer.setTrickMode(mSurfaceTexture->getTrickMode());
+    layer.setVideoSessionID(mSurfaceTexture->getVideoSessionID());
 }
 
 void Layer::setAcquireFence(const sp<const DisplayDevice>& hw,
