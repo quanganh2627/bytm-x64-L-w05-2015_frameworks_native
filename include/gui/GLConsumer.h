@@ -193,6 +193,9 @@ public:
     // log messages.
     void setName(const String8& name);
 
+    // getVideoSessionID returns video session ID
+    uint32_t getVideoSessionID() const;
+
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
     status_t setDefaultBufferFormat(uint32_t defaultFormat);
@@ -427,6 +430,9 @@ private:
     // that no buffer is bound to the texture. A call to setBufferCount will
     // reset mCurrentTexture to INVALID_BUFFER_SLOT.
     int mCurrentTexture;
+
+    // mVideoSessionID indicates video session ID
+    uint32_t mVideoSessionID;
 
     // mAttached indicates whether the ConsumerBase is currently attached to
     // an OpenGL ES context.  For legacy reasons, this is initialized to true,
