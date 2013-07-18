@@ -538,16 +538,6 @@ status_t BufferQueue::queueBuffer(int buf,
                     "buffer in slot %d", buf);
             return -EINVAL;
         }
-#ifdef USE_IMG_GRAPHICS
-        if (mSlots[buf].mGraphicBuffer->handle != NULL) {
-            IMG_native_handle_t *nativeBuffer =
-                (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
-            if (privateFlag)
-                nativeBuffer->hint |= GRALLOC_HAL_HINT_TIME_SEEKING;
-            else
-                nativeBuffer->hint &= ~GRALLOC_HAL_HINT_TIME_SEEKING;
-        }
-#endif
 
         if (mSynchronousMode) {
             // In synchronous mode we queue all buffers in a FIFO.
