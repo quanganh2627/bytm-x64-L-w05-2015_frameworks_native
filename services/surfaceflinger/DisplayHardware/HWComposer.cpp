@@ -851,6 +851,9 @@ public:
             getLayer()->flags &= ~HWC_TRICK_MODE;
         }
     }
+    virtual void setVideoSessionID(uint32_t sessionID) {
+        getLayer()->flags |= sessionID;
+    }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;
     }

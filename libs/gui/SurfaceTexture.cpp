@@ -130,7 +130,8 @@ SurfaceTexture::SurfaceTexture(GLuint tex, bool allowSynchronousMode,
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
     mAttached(true),
-    mTrickMode(false)
+    mTrickMode(false),
+    mVideoSessionID(0)
 {
     ST_LOGV("SurfaceTexture");
 
@@ -305,6 +306,7 @@ status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter, bool skipSync)
         mCurrentTimestamp = item.mTimestamp;
         mCurrentFence = item.mFence;
         mTrickMode = item.mTrickMode;
+        mVideoSessionID = item.mVideoSessionID;
         if (!skipSync) {
             // SurfaceFlinger needs to lazily perform GLES synchronization
             // only when it's actually going to use GLES for compositing.
@@ -774,6 +776,11 @@ sp<Fence> SurfaceTexture::getCurrentFence() const {
 bool SurfaceTexture::getTrickMode() const {
     Mutex::Autolock lock(mMutex);
     return mTrickMode;
+}
+
+uint32_t SurfaceTexture::getVideoSessionID() const {
+    Mutex::Autolock lock(mMutex);
+    return mVideoSessionID;
 }
 
 status_t SurfaceTexture::doGLFenceWait() const {

@@ -499,10 +499,17 @@ status_t BufferQueue::queueBuffer(int buf,
     sp<Fence> fence;
 
     input.deflate(&timestamp, &crop, &scalingMode, &transform, &fence);
-    bool privateFlag = false;
-    if (scalingMode & (1 << 31)) {
-        scalingMode &= ~(1 << 31);
-        privateFlag = true;
+    bool trickModeFlag = false;
+    if (scalingMode & (1 << 30)) {
+        scalingMode &= ~(1 << 30);
+        trickModeFlag = true;
+    }
+    uint32_t sessionId = 0;
+    if (scalingMode & (1 << 29)) {
+        sessionId = (1 << 29);
+        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
+        scalingMode &= ~(1 << 29);
+        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
     }
 
     ST_LOGV("queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
@@ -543,10 +550,11 @@ status_t BufferQueue::queueBuffer(int buf,
             return -EINVAL;
         }
 #ifdef USE_IMG_GRAPHICS
+        // Only used on CTP
         if (mSlots[buf].mGraphicBuffer->handle != NULL) {
             IMG_native_handle_t *nativeBuffer =
                 (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
-            if (privateFlag)
+            if (trickModeFlag)
                 nativeBuffer->hint |= GRALLOC_HAL_HINT_TIME_SEEKING;
             else
                 nativeBuffer->hint &= ~GRALLOC_HAL_HINT_TIME_SEEKING;
@@ -616,7 +624,8 @@ status_t BufferQueue::queueBuffer(int buf,
         mSlots[buf].mCrop = crop;
         mSlots[buf].mTransform = transform;
         mSlots[buf].mFence = fence;
-        mSlots[buf].mTrickMode = privateFlag;
+        mSlots[buf].mTrickMode = trickModeFlag;
+        mSlots[buf].mVideoSessionID = sessionId;
 
         switch (scalingMode) {
             case NATIVE_WINDOW_SCALING_MODE_FREEZE:
@@ -903,12 +912,14 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         buffer->mBuf = buf;
         buffer->mFence = mSlots[buf].mFence;
         buffer->mTrickMode = mSlots[buf].mTrickMode;
+        buffer->mVideoSessionID = mSlots[buf].mVideoSessionID;
 
         mSlots[buf].mAcquireCalled = true;
         mSlots[buf].mNeedsCleanupOnRelease = false;
         mSlots[buf].mBufferState = BufferSlot::ACQUIRED;
         mSlots[buf].mFence.clear();
         mSlots[buf].mTrickMode = false;
+        mSlots[buf].mVideoSessionID = 0;
 
         mQueue.erase(front);
         mDequeueCondition.broadcast();

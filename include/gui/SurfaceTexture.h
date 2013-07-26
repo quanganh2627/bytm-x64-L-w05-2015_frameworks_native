@@ -172,6 +172,9 @@ public:
     // getTrickMode returns whether video is in trick playback
     bool getTrickMode() const;
 
+    // getVideoSessionID returns video session ID
+    uint32_t getVideoSessionID() const;
+
     // set the name of the SurfaceTexture that will be used to identify it in
     // log messages.
     void setName(const String8& name);
@@ -403,6 +406,9 @@ private:
     // mTrickMode indicates whether the current surface is used for trick
     // playback.
     bool mTrickMode;
+
+    // mVideoSessionID indicates video session ID
+    uint32_t mVideoSessionID;
 };
 
 // ----------------------------------------------------------------------------

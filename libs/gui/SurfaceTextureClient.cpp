@@ -290,20 +290,29 @@ int SurfaceTextureClient::queueBuffer(android_native_buffer_t* buffer, int fence
         return i;
     }
 
-    // Put a special flag if the buffer
-    uint32_t privateFlag = 0;
+    // Put a special trick mode flag
+    uint32_t trickModeFlag = 0;
     if (buffer->usage & GRALLOC_USAGE_PRIVATE_2) {
         buffer->usage &= ~GRALLOC_USAGE_PRIVATE_2;
-        privateFlag = 1 << 31;
+        trickModeFlag = (1 << 30);
     }
 
+    // Put a special mds session ID
+    uint32_t sessionID = 0;
+    if (buffer->usage & GRALLOC_USAGE_PRIVATE_3) {
+        sessionID = 1 << 29;
+        sessionID |= (buffer->usage & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
+        buffer->usage &= ~GRALLOC_USAGE_PRIVATE_3;
+        buffer->usage &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
+    }
+    ALOGV("0x%x, 0x%x, 0x%x", mScalingMode, trickModeFlag, sessionID);
     // Make sure the crop rectangle is entirely inside the buffer.
     Rect crop;
     mCrop.intersect(Rect(buffer->width, buffer->height), &crop);
 
     sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : NULL);
     ISurfaceTexture::QueueBufferOutput output;
-    ISurfaceTexture::QueueBufferInput input(timestamp, crop, mScalingMode | privateFlag,
+    ISurfaceTexture::QueueBufferInput input(timestamp, crop, mScalingMode | trickModeFlag | sessionID,
             mTransform, fence);
     status_t err = mSurfaceTexture->queueBuffer(i, input, &output);
     if (err != OK)  {
