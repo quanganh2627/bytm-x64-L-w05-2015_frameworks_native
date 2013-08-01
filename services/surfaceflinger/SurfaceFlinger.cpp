@@ -62,6 +62,7 @@
 #include "Layer.h"
 #include "LayerDim.h"
 #include "LayerScreenshot.h"
+#include "Ditherer.h"
 #include "SurfaceFlinger.h"
 
 #include "DisplayHardware/FramebufferSurface.h"
@@ -114,6 +115,9 @@ SurfaceFlinger::SurfaceFlinger()
         mMutexLocked(false),
         mSurfaceFlingerThreadId(0),
         mBypassComposition(false)
+#if ENABLE_POSTPROCESS_DITHER
+      , mDitherer(0)
+#endif
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -148,6 +152,9 @@ void SurfaceFlinger::onFirstRef()
 
 SurfaceFlinger::~SurfaceFlinger()
 {
+#if ENABLE_POSTPROCESS_DITHER
+    delete mDitherer;
+#endif
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglTerminate(display);
@@ -270,11 +277,7 @@ status_t SurfaceFlinger::selectConfigForAttribute(
                 EGLint value = 0;
                 eglGetConfigAttrib(dpy, configs[i], attribute, &value);
                 if (wanted == value) {
-#if !(defined ENABLE_INTEL_CONFIG_18BPP)
                     *outConfig = configs[i];
-#else
-                    *outConfig = configs[0]; /* this can be done better */
-#endif
                     delete [] configs;
                     return NO_ERROR;
                 }
@@ -357,28 +360,6 @@ EGLConfig SurfaceFlinger::selectEGLConfig(EGLDisplay display, EGLint nativeVisua
     attribs[EGL_GREEN_SIZE]                 = 8;
     attribs[EGL_BLUE_SIZE]                  = 8;
 
-#if (defined ENABLE_INTEL_CONFIG_18BPP)
-    // allow less than 24-bit color; the non-gpu-accelerated emulator only
-    // supports 16-bit color
-    attribs.remove(EGL_RED_SIZE);
-    attribs.remove(EGL_GREEN_SIZE);
-    attribs.remove(EGL_BLUE_SIZE);
-    attribs.remove(EGL_FRAMEBUFFER_TARGET_ANDROID);
-    attribs.remove(EGL_RECORDABLE_ANDROID);
-    err = selectConfigForAttribute(display, attribs,
-            EGL_NATIVE_VISUAL_ID, nativeVisualId, &config);
-    if (!err) {
-        ALOGE("JB: setting to 565 worked with all removed in SurfaceFlinger::selectEGLConfig");
-        EGLint r,g,b,a;
-        eglGetConfigAttrib(display, config, EGL_RED_SIZE,   &r);
-        eglGetConfigAttrib(display, config, EGL_GREEN_SIZE, &g);
-        eglGetConfigAttrib(display, config, EGL_BLUE_SIZE,  &b);
-        eglGetConfigAttrib(display, config, EGL_ALPHA_SIZE, &a);
-        ALOGE("JB: EGLSurface: %d-%d-%d-%d, config=%p", r, g, b, a, config);
-        goto success;
-    }
-#endif /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-
     err = selectConfigForAttribute(display, attribs, EGL_NONE, EGL_NONE, &config);
     if (!err)
         goto success;
@@ -455,13 +436,7 @@ void SurfaceFlinger::initializeGL(EGLDisplay display) {
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     glEnableClientState(GL_VERTEX_ARRAY);
     glShadeModel(GL_FLAT);
-
-#if !(defined ENABLE_INTEL_CONFIG_18BPP)
     glDisable(GL_DITHER);
-#else /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-    glEnable(GL_DITHER); /* turn on our color calculator state */
-#endif /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-
     glDisable(GL_CULL_FACE);
 
     struct pack565 {
@@ -579,6 +554,10 @@ status_t SurfaceFlinger::readyToRun()
     startBootAnim();
 
     mSurfaceFlingerThreadId = getThreadId();
+
+#if ENABLE_POSTPROCESS_DITHER
+    mDitherer = new Ditherer();
+#endif
 
     return NO_ERROR;
 }
@@ -1858,6 +1837,13 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 
     // disable scissor at the end of the frame
     glDisable(GL_SCISSOR_TEST);
+
+#if ENABLE_POSTPROCESS_DITHER
+    if (hasGlesComposition)
+    {
+        mDitherer->apply(0, 0, hw->getWidth(), hw->getHeight());
+    }
+#endif
 }
 
 void SurfaceFlinger::drawWormhole(const sp<const DisplayDevice>& hw,

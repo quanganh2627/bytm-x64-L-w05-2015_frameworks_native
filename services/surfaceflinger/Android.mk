@@ -18,13 +18,14 @@ LOCAL_SRC_FILES:= \
     SurfaceFlinger.cpp                      \
     SurfaceTextureLayer.cpp                 \
     Transform.cpp                           \
-    
+
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
 ifeq ($(strip $(ENABLE_INTEL_CONFIG_18BPP)),true)
-LOCAL_CFLAGS += -DENABLE_INTEL_CONFIG_18BPP
+LOCAL_SRC_FILES += Ditherer.cpp
+LOCAL_CFLAGS += -DENABLE_POSTPROCESS_DITHER=1
 endif
 
 ifeq ($(TARGET_BOARD_PLATFORM),omap3)
