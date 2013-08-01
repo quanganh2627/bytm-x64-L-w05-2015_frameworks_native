@@ -62,6 +62,9 @@ class IGraphicBufferAlloc;
 class Layer;
 class LayerDim;
 class Surface;
+#if ENABLE_POSTPROCESS_DITHER
+class Ditherer;
+#endif
 
 // ---------------------------------------------------------------------------
 
@@ -503,6 +506,10 @@ private:
 
     sp<IBinder> mExtDisplayToken;
     bool mBypassComposition;
+
+#if ENABLE_POSTPROCESS_DITHER
+    Ditherer* mDitherer;
+#endif
 };
 
 // ---------------------------------------------------------------------------
