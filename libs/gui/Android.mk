@@ -37,7 +37,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 
 ifeq ($(ENABLE_IMG_GRAPHICS), true)
-ifneq ($(ENABLE_MRFL_GRAPHICS),true)
+ifeq ($(BOARD_USES_WRS_OMXIL_CORE),true)
 	LOCAL_C_INCLUDES += \
             $(TARGET_OUT_HEADERS)/pvr/hal \
             $(TARGET_OUT_HEADERS)/khronos/openmax
