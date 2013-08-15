@@ -146,7 +146,7 @@ DisplayDevice::~DisplayDevice() {
 void DisplayDevice::disconnect(HWComposer& hwc) {
     if (mHwcDisplayId >= 0) {
         hwc.disconnectDisplay(mHwcDisplayId);
-        if (mHwcDisplayId >= DISPLAY_VIRTUAL)
+        if (mHwcDisplayId > DISPLAY_VIRTUAL)
             hwc.freeDisplayId(mHwcDisplayId);
         mHwcDisplayId = -1;
     }
