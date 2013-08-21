@@ -50,6 +50,7 @@ static struct {
     { AID_RADIO, "radio.phonesubinfo" },
     { AID_RADIO, "radio.simphonebook" },
     { AID_RADIO, "oemtelephony" },
+    { AID_RADIO, "imsservice" },
 /* TODO: remove after phone services are updated: */
     { AID_RADIO, "phone" },
     { AID_RADIO, "sip" },
