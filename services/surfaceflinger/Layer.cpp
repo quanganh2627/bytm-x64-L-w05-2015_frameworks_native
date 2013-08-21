@@ -64,7 +64,8 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client)
         mGLExtensions(GLExtensions::getInstance()),
         mOpaqueLayer(true),
         mSecure(false),
-        mProtectedByApp(false)
+        mProtectedByApp(false),
+        mTrickMode(false)
 {
     mCurrentCrop.makeInvalid();
     glGenTextures(1, &mTextureName);
@@ -290,6 +291,11 @@ void Layer::setPerFrameData(const sp<const DisplayDevice>& hw,
 
     layer.setTrickMode(mSurfaceTexture->getTrickMode());
     layer.setVideoSessionID(mSurfaceTexture->getVideoSessionID());
+
+    if (mSurfaceTexture->getTrickMode() != mTrickMode) {
+        mFlinger->invalidateHwcGeometry();
+        mTrickMode = mSurfaceTexture->getTrickMode();
+    }
 }
 
 void Layer::setAcquireFence(const sp<const DisplayDevice>& hw,

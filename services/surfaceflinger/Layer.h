@@ -146,6 +146,7 @@ private:
     // page-flip thread (currently main thread)
     bool mSecure;         // no screenshots
     bool mProtectedByApp; // application requires protected path to external sink
+    bool mTrickMode;
 };
 
 // ---------------------------------------------------------------------------
