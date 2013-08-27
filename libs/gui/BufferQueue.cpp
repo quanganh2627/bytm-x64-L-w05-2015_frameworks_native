@@ -29,8 +29,15 @@
 #include <private/gui/ComposerService.h>
 
 #include <utils/Log.h>
-#include <gui/SurfaceTexture.h>
 #include <utils/Trace.h>
+
+#ifdef USE_IMG_GRAPHICS
+#include <OMX_IVCommon.h>
+#include <hal_public.h>
+#endif
+
+static const nsecs_t dequeueTimeout = seconds(5);
+
 
 // Macros for including the BufferQueue name in log messages
 #define ST_LOGV(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
@@ -107,7 +114,7 @@ status_t BufferQueue::setDefaultMaxBufferCountLocked(int count) {
     mDefaultMaxBufferCount = count;
     mDequeueCondition.broadcast();
 
-    return OK;
+    return NO_ERROR;
 }
 
 bool BufferQueue::isSynchronousMode() const {
@@ -123,20 +130,20 @@ void BufferQueue::setConsumerName(const String8& name) {
 status_t BufferQueue::setDefaultBufferFormat(uint32_t defaultFormat) {
     Mutex::Autolock lock(mMutex);
     mDefaultBufferFormat = defaultFormat;
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::setConsumerUsageBits(uint32_t usage) {
     Mutex::Autolock lock(mMutex);
     mConsumerUsageBits = usage;
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::setTransformHint(uint32_t hint) {
     ST_LOGV("setTransformHint: %02x", hint);
     Mutex::Autolock lock(mMutex);
     mTransformHint = hint;
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::setBufferCount(int bufferCount) {
@@ -147,11 +154,12 @@ status_t BufferQueue::setBufferCount(int bufferCount) {
         Mutex::Autolock lock(mMutex);
 
         if (mAbandoned) {
-            ST_LOGE("setBufferCount: SurfaceTexture has been abandoned!");
+            ST_LOGE("setBufferCount: BufferQueue has been abandoned!");
             return NO_INIT;
         }
         if (bufferCount > NUM_BUFFER_SLOTS) {
-            ST_LOGE("setBufferCount: bufferCount larger than slots available");
+            ST_LOGE("setBufferCount: bufferCount too large (max %d)",
+                    NUM_BUFFER_SLOTS);
             return BAD_VALUE;
         }
 
@@ -168,7 +176,7 @@ status_t BufferQueue::setBufferCount(int bufferCount) {
         if (bufferCount == 0) {
             mOverrideMaxBufferCount = 0;
             mDequeueCondition.broadcast();
-            return OK;
+            return NO_ERROR;
         }
 
         if (bufferCount < minBufferSlots) {
@@ -192,7 +200,7 @@ status_t BufferQueue::setBufferCount(int bufferCount) {
         listener->onBuffersReleased();
     }
 
-    return OK;
+    return NO_ERROR;
 }
 
 int BufferQueue::query(int what, int* outValue)
@@ -201,7 +209,7 @@ int BufferQueue::query(int what, int* outValue)
     Mutex::Autolock lock(mMutex);
 
     if (mAbandoned) {
-        ST_LOGE("query: SurfaceTexture has been abandoned!");
+        ST_LOGE("query: BufferQueue has been abandoned!");
         return NO_INIT;
     }
 
@@ -234,7 +242,7 @@ status_t BufferQueue::requestBuffer(int slot, sp<GraphicBuffer>* buf) {
     ST_LOGV("requestBuffer: slot=%d", slot);
     Mutex::Autolock lock(mMutex);
     if (mAbandoned) {
-        ST_LOGE("requestBuffer: SurfaceTexture has been abandoned!");
+        ST_LOGE("requestBuffer: BufferQueue has been abandoned!");
         return NO_INIT;
     }
     int maxBufferCount = getMaxBufferCountLocked();
@@ -255,7 +263,7 @@ status_t BufferQueue::requestBuffer(int slot, sp<GraphicBuffer>* buf) {
     return NO_ERROR;
 }
 
-status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
+status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence,
         uint32_t w, uint32_t h, uint32_t format, uint32_t usage) {
     ATRACE_CALL();
     ST_LOGV("dequeueBuffer: w=%d h=%d fmt=%#x usage=%#x", w, h, format, usage);
@@ -283,7 +291,7 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
         bool tryAgain = true;
         while (tryAgain) {
             if (mAbandoned) {
-                ST_LOGE("dequeueBuffer: SurfaceTexture has been abandoned!");
+                ST_LOGE("dequeueBuffer: BufferQueue has been abandoned!");
                 return NO_INIT;
             }
 
@@ -295,7 +303,7 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
                 assert(mSlots[i].mBufferState == BufferSlot::FREE);
                 if (mSlots[i].mGraphicBuffer != NULL) {
                     freeBufferLocked(i);
-                    returnFlags |= ISurfaceTexture::RELEASE_ALL_BUFFERS;
+                    returnFlags |= IGraphicBufferProducer::RELEASE_ALL_BUFFERS;
                 }
             }
 
@@ -350,7 +358,10 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
             // the max buffer count to change.
             tryAgain = found == INVALID_BUFFER_SLOT;
             if (tryAgain) {
-                mDequeueCondition.wait(mMutex);
+                if (mDequeueCondition.waitRelative(mMutex, dequeueTimeout)) {
+                    ST_LOGE("dequeueBuffer: time out and will free all buffer!");
+                    freeAllBuffersLocked();
+                }
             }
         }
 
@@ -373,8 +384,6 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
             h = mDefaultHeight;
         }
 
-        // buffer is now in DEQUEUED (but can also be current at the same time,
-        // if we're in synchronous mode)
         mSlots[buf].mBufferState = BufferSlot::DEQUEUED;
 
         const sp<GraphicBuffer>& buffer(mSlots[buf].mGraphicBuffer);
@@ -388,21 +397,22 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
             mSlots[buf].mGraphicBuffer = NULL;
             mSlots[buf].mRequestBufferCalled = false;
             mSlots[buf].mEglFence = EGL_NO_SYNC_KHR;
-            mSlots[buf].mFence.clear();
+            mSlots[buf].mFence = Fence::NO_FENCE;
             mSlots[buf].mEglDisplay = EGL_NO_DISPLAY;
 
-            returnFlags |= ISurfaceTexture::BUFFER_NEEDS_REALLOCATION;
+            returnFlags |= IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION;
         }
 
         dpy = mSlots[buf].mEglDisplay;
         eglFence = mSlots[buf].mEglFence;
-        outFence = mSlots[buf].mFence;
+        *outFence = mSlots[buf].mFence;
         mSlots[buf].mEglFence = EGL_NO_SYNC_KHR;
-        mSlots[buf].mFence.clear();
+        mSlots[buf].mFence = Fence::NO_FENCE;
     }  // end lock scope
 
-    if (returnFlags & ISurfaceTexture::BUFFER_NEEDS_REALLOCATION) {
+    if (returnFlags & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
         status_t error;
+        mGraphicBufferAlloc->acquireBufferReferenceSlot(*outBuf);
         sp<GraphicBuffer> graphicBuffer(
                 mGraphicBufferAlloc->createGraphicBuffer(
                         w, h, format, usage, &error));
@@ -416,14 +426,13 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
             Mutex::Autolock lock(mMutex);
 
             if (mAbandoned) {
-                ST_LOGE("dequeueBuffer: SurfaceTexture has been abandoned!");
+                ST_LOGE("dequeueBuffer: BufferQueue has been abandoned!");
                 return NO_INIT;
             }
 
             mSlots[*outBuf].mGraphicBuffer = graphicBuffer;
         }
     }
-
 
     if (eglFence != EGL_NO_SYNC_KHR) {
         EGLint result = eglClientWaitSyncKHR(dpy, eglFence, 0, 1000000000);
@@ -450,7 +459,7 @@ status_t BufferQueue::setSynchronousMode(bool enabled) {
     Mutex::Autolock lock(mMutex);
 
     if (mAbandoned) {
-        ST_LOGE("setSynchronousMode: SurfaceTexture has been abandoned!");
+        ST_LOGE("setSynchronousMode: BufferQueue has been abandoned!");
         return NO_INIT;
     }
 
@@ -488,6 +497,23 @@ status_t BufferQueue::queueBuffer(int buf,
     sp<Fence> fence;
 
     input.deflate(&timestamp, &crop, &scalingMode, &transform, &fence);
+    bool privateFlag = false;
+    if (scalingMode & (1 << 30)) {
+        scalingMode &= ~(1 << 30);
+        privateFlag = true;
+    }
+    uint32_t sessionId = 0;
+    if (scalingMode & (1 << 29)) {
+        sessionId = (1 << 29);
+        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
+        scalingMode &= ~(1 << 29);
+        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
+    }
+
+    if (fence == NULL) {
+        ST_LOGE("queueBuffer: fence is NULL");
+        return BAD_VALUE;
+    }
 
     ST_LOGV("queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
             "scale=%s",
@@ -499,7 +525,7 @@ status_t BufferQueue::queueBuffer(int buf,
     { // scope for the lock
         Mutex::Autolock lock(mMutex);
         if (mAbandoned) {
-            ST_LOGE("queueBuffer: SurfaceTexture has been abandoned!");
+            ST_LOGE("queueBuffer: BufferQueue has been abandoned!");
             return NO_INIT;
         }
         int maxBufferCount = getMaxBufferCountLocked();
@@ -535,20 +561,54 @@ status_t BufferQueue::queueBuffer(int buf,
             // be consumed.
             listener = mConsumerListener;
         } else {
-            // In asynchronous mode we only keep the most recent buffer.
-            if (mQueue.empty()) {
-                mQueue.push_back(buf);
+            bool useOriginalAsyncMode = true;
+#ifdef USE_IMG_GRAPHICS
+            //Only for HW decoder format
+            if (mConnectedApi == NATIVE_WINDOW_API_MEDIA &&
+                    mSlots[buf].mGraphicBuffer->handle != NULL) {
+                IMG_native_handle_t *nativeBuffer =
+                    (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
+                if (nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar ||
+                        nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled)
+                    useOriginalAsyncMode = false;
+            }
+#endif
+            if (!useOriginalAsyncMode) {
+                // Here we couldn't use original asynchronous mode for video playback,
+                // because there is a timing sequence issue between
+                // video queue buffer and SurfaceFlinger's vsync.
+                // Video render is different with GUI,
+                // GUI will wait for a vsync from HWC, then queue buffer.
+                // So increase buffer's number to 2 to avoid buffer overwrite,
+                // and 1 video frame latency is acceptable for A/V sync.
+                if (mQueue.size() <= 1) {
+                    mQueue.push_back(buf);
 
-                // Asynchronous mode only signals that a frame should be
-                // consumed if no previous frame was pending. If a frame were
-                // pending then the consumer would have already been notified.
-                listener = mConsumerListener;
+                    listener = mConsumerListener;
+                } else {
+                    // clear all queued buffers
+                    Fifo::iterator i(mQueue.begin());
+                    while(i != mQueue.end())
+                        mSlots[*i++].mBufferState = BufferSlot::FREE;
+                    mQueue.clear();
+                    mQueue.push_back(buf);
+                }
             } else {
-                Fifo::iterator front(mQueue.begin());
-                // buffer currently queued is freed
-                mSlots[*front].mBufferState = BufferSlot::FREE;
-                // and we record the new buffer index in the queued list
-                *front = buf;
+                // In asynchronous mode we only keep the most recent buffer.
+                if (mQueue.empty()) {
+                    mQueue.push_back(buf);
+
+                    // Asynchronous mode only signals that a frame should be
+                    // consumed if no previous frame was pending. If a frame were
+                    // pending then the consumer would have already been notified.
+                    listener = mConsumerListener;
+                } else {
+                    Fifo::iterator front(mQueue.begin());
+                    // buffer currently queued is freed
+                    mSlots[*front].mBufferState = BufferSlot::FREE;
+                    // and we record the new buffer index in the queued list
+                    *front = buf;
+                }
             }
         }
 
@@ -556,6 +616,8 @@ status_t BufferQueue::queueBuffer(int buf,
         mSlots[buf].mCrop = crop;
         mSlots[buf].mTransform = transform;
         mSlots[buf].mFence = fence;
+        mSlots[buf].mTrickMode = privateFlag;
+        mSlots[buf].mVideoSessionID = sessionId;
 
         switch (scalingMode) {
             case NATIVE_WINDOW_SCALING_MODE_FREEZE:
@@ -586,10 +648,10 @@ status_t BufferQueue::queueBuffer(int buf,
     if (listener != 0) {
         listener->onFrameAvailable();
     }
-    return OK;
+    return NO_ERROR;
 }
 
-void BufferQueue::cancelBuffer(int buf, sp<Fence> fence) {
+void BufferQueue::cancelBuffer(int buf, const sp<Fence>& fence) {
     ATRACE_CALL();
     ST_LOGV("cancelBuffer: slot=%d", buf);
     Mutex::Autolock lock(mMutex);
@@ -607,6 +669,9 @@ void BufferQueue::cancelBuffer(int buf, sp<Fence> fence) {
     } else if (mSlots[buf].mBufferState != BufferSlot::DEQUEUED) {
         ST_LOGE("cancelBuffer: slot %d is not owned by the client (state=%d)",
                 buf, mSlots[buf].mBufferState);
+        return;
+    } else if (fence == NULL) {
+        ST_LOGE("cancelBuffer: fence is NULL");
         return;
     }
     mSlots[buf].mBufferState = BufferSlot::FREE;
@@ -774,6 +839,7 @@ void BufferQueue::dump(String8& result, const char* prefix,
 void BufferQueue::freeBufferLocked(int slot) {
     ST_LOGV("freeBufferLocked: slot=%d", slot);
     mSlots[slot].mGraphicBuffer = 0;
+    mGraphicBufferAlloc->releaseBufferReferenceSlot(slot);
     if (mSlots[slot].mBufferState == BufferSlot::ACQUIRED) {
         mSlots[slot].mNeedsCleanupOnRelease = true;
     }
@@ -786,7 +852,7 @@ void BufferQueue::freeBufferLocked(int slot) {
         eglDestroySyncKHR(mSlots[slot].mEglDisplay, mSlots[slot].mEglFence);
         mSlots[slot].mEglFence = EGL_NO_SYNC_KHR;
     }
-    mSlots[slot].mFence.clear();
+    mSlots[slot].mFence = Fence::NO_FENCE;
 }
 
 void BufferQueue::freeAllBuffersLocked() {
@@ -840,11 +906,15 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         buffer->mTimestamp = mSlots[buf].mTimestamp;
         buffer->mBuf = buf;
         buffer->mFence = mSlots[buf].mFence;
+        buffer->mTrickMode = mSlots[buf].mTrickMode;
+        buffer->mVideoSessionID = mSlots[buf].mVideoSessionID;
 
         mSlots[buf].mAcquireCalled = true;
         mSlots[buf].mNeedsCleanupOnRelease = false;
         mSlots[buf].mBufferState = BufferSlot::ACQUIRED;
-        mSlots[buf].mFence.clear();
+        mSlots[buf].mFence = Fence::NO_FENCE;
+        mSlots[buf].mTrickMode = false;
+        mSlots[buf].mVideoSessionID = 0;
 
         mQueue.erase(front);
         mDequeueCondition.broadcast();
@@ -854,7 +924,7 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         return NO_BUFFER_AVAILABLE;
     }
 
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::releaseBuffer(int buf, EGLDisplay display,
@@ -864,8 +934,8 @@ status_t BufferQueue::releaseBuffer(int buf, EGLDisplay display,
 
     Mutex::Autolock _l(mMutex);
 
-    if (buf == INVALID_BUFFER_SLOT) {
-        return -EINVAL;
+    if (buf == INVALID_BUFFER_SLOT || fence == NULL) {
+        return BAD_VALUE;
     }
 
     mSlots[buf].mEglDisplay = display;
@@ -885,7 +955,7 @@ status_t BufferQueue::releaseBuffer(int buf, EGLDisplay display,
     }
 
     mDequeueCondition.broadcast();
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::consumerConnect(const sp<ConsumerListener>& consumerListener) {
@@ -896,10 +966,14 @@ status_t BufferQueue::consumerConnect(const sp<ConsumerListener>& consumerListen
         ST_LOGE("consumerConnect: BufferQueue has been abandoned!");
         return NO_INIT;
     }
+    if (consumerListener == NULL) {
+        ST_LOGE("consumerConnect: consumerListener may not be NULL");
+        return BAD_VALUE;
+    }
 
     mConsumerListener = consumerListener;
 
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::consumerDisconnect() {
@@ -916,10 +990,10 @@ status_t BufferQueue::consumerDisconnect() {
     mQueue.clear();
     freeAllBuffersLocked();
     mDequeueCondition.broadcast();
-    return OK;
+    return NO_ERROR;
 }
 
-status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
+status_t BufferQueue::getReleasedBuffers(uint64_t* slotMask) {
     ST_LOGV("getReleasedBuffers");
     Mutex::Autolock lock(mMutex);
 
@@ -928,10 +1002,10 @@ status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
         return NO_INIT;
     }
 
-    uint32_t mask = 0;
+    uint64_t mask = 0;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
         if (!mSlots[i].mAcquireCalled) {
-            mask |= 1 << i;
+            mask |= (1ULL << i);
         }
     }
     *slotMask = mask;
@@ -952,7 +1026,7 @@ status_t BufferQueue::setDefaultBufferSize(uint32_t w, uint32_t h)
     Mutex::Autolock lock(mMutex);
     mDefaultWidth = w;
     mDefaultHeight = h;
-    return OK;
+    return NO_ERROR;
 }
 
 status_t BufferQueue::setDefaultMaxBufferCount(int bufferCount) {
@@ -973,25 +1047,29 @@ status_t BufferQueue::setMaxAcquiredBufferCount(int maxAcquiredBuffers) {
         return INVALID_OPERATION;
     }
     mMaxAcquiredBufferCount = maxAcquiredBuffers;
-    return OK;
+    return NO_ERROR;
 }
 
 void BufferQueue::freeAllBuffersExceptHeadLocked() {
     int head = -1;
+    int head2 = -1;
     if (!mQueue.empty()) {
         Fifo::iterator front(mQueue.begin());
         head = *front;
+	if (mQueue.size() > 1){
+		head2 = *(++front);
+	}
     }
     mBufferHasBeenQueued = false;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (i != head) {
+        if (i != head && i != head2) {
             freeBufferLocked(i);
         }
     }
 }
 
 status_t BufferQueue::drainQueueLocked() {
-    while (mSynchronousMode && !mQueue.isEmpty()) {
+    while (mSynchronousMode && mQueue.size() > 1) {
         mDequeueCondition.wait(mMutex);
         if (mAbandoned) {
             ST_LOGE("drainQueueLocked: BufferQueue has been abandoned!");
@@ -1008,7 +1086,7 @@ status_t BufferQueue::drainQueueLocked() {
 status_t BufferQueue::drainQueueAndFreeBuffersLocked() {
     status_t err = drainQueueLocked();
     if (err == NO_ERROR) {
-        if (mSynchronousMode) {
+        if (mQueue.empty()) {
             freeAllBuffersLocked();
         } else {
             freeAllBuffersExceptHeadLocked();

@@ -627,10 +627,26 @@ status_t Parcel::writeFloat(float val)
     return writeAligned(val);
 }
 
+#if defined(__mips__) && defined(__mips_hard_float)
+
+status_t Parcel::writeDouble(double val)
+{
+    union {
+        double d;
+        unsigned long long ll;
+    } u;
+    u.d = val;
+    return writeAligned(u.ll);
+}
+
+#else
+
 status_t Parcel::writeDouble(double val)
 {
     return writeAligned(val);
 }
+
+#endif
 
 status_t Parcel::writeIntPtr(intptr_t val)
 {
@@ -962,16 +978,43 @@ float Parcel::readFloat() const
     return readAligned<float>();
 }
 
+#if defined(__mips__) && defined(__mips_hard_float)
+
+status_t Parcel::readDouble(double *pArg) const
+{
+    union {
+      double d;
+      unsigned long long ll;
+    } u;
+    status_t status;
+    status = readAligned(&u.ll);
+    *pArg = u.d;
+    return status;
+}
+
+double Parcel::readDouble() const
+{
+    union {
+      double d;
+      unsigned long long ll;
+    } u;
+    u.ll = readAligned<unsigned long long>();
+    return u.d;
+}
+
+#else
+
 status_t Parcel::readDouble(double *pArg) const
 {
     return readAligned(pArg);
 }
 
-
 double Parcel::readDouble() const
 {
     return readAligned<double>();
 }
+
+#endif
 
 status_t Parcel::readIntPtr(intptr_t *pArg) const
 {
@@ -1427,7 +1470,8 @@ status_t Parcel::continueWrite(size_t desired)
         size_t* objects = NULL;
         
         if (objectsSize) {
-            objects = (size_t*)malloc(objectsSize*sizeof(size_t));
+            //valgrind warning fix: it is necessary to initialize the allocated memory
+            objects = (size_t*)calloc(objectsSize, sizeof(size_t));
             if (!objects) {
                 mError = NO_MEMORY;
                 return NO_MEMORY;
@@ -1504,7 +1548,8 @@ status_t Parcel::continueWrite(size_t desired)
         
     } else {
         // This is the first data.  Easy!
-        uint8_t* data = (uint8_t*)malloc(desired);
+        //valgrind warning fix: it is necessary to initialize the allocated memory
+        uint8_t* data = (uint8_t*)calloc(desired, sizeof(uint8_t));
         if (!data) {
             mError = NO_MEMORY;
             return NO_MEMORY;

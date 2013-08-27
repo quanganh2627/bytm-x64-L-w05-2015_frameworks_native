@@ -283,15 +283,20 @@ void ProcessState::setArgV0(const char* txt)
     }
 }
 
+String8 ProcessState::makeBinderThreadName() {
+    int32_t s = android_atomic_add(1, &mThreadPoolSeq);
+    String8 name;
+    name.appendFormat("Binder_%X", s);
+    return name;
+}
+
 void ProcessState::spawnPooledThread(bool isMain)
 {
     if (mThreadPoolStarted) {
-        int32_t s = android_atomic_add(1, &mThreadPoolSeq);
-        char buf[16];
-        snprintf(buf, sizeof(buf), "Binder_%X", s);
-        ALOGV("Spawning new pooled thread, name=%s\n", buf);
+        String8 name = makeBinderThreadName();
+        ALOGV("Spawning new pooled thread, name=%s\n", name.string());
         sp<Thread> t = new PoolThread(isMain);
-        t->run(buf);
+        t->run(name.string());
     }
 }
 
@@ -304,12 +309,16 @@ status_t ProcessState::setThreadPoolMaxThreadCount(size_t maxThreads) {
     return result;
 }
 
+void ProcessState::giveThreadPoolName() {
+    androidSetThreadName( makeBinderThreadName().string() );
+}
+
 static int open_driver()
 {
     int fd = open("/dev/binder", O_RDWR);
     if (fd >= 0) {
         fcntl(fd, F_SETFD, FD_CLOEXEC);
-        int vers;
+        int vers = 0;
         status_t result = ioctl(fd, BINDER_VERSION, &vers);
         if (result == -1) {
             ALOGE("Binder ioctl to obtain version failed: %s", strerror(errno));

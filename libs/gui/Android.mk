@@ -3,29 +3,30 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
 	BitTube.cpp \
+	BufferItemConsumer.cpp \
 	BufferQueue.cpp \
 	ConsumerBase.cpp \
+	CpuConsumer.cpp \
 	DisplayEventReceiver.cpp \
+	DummyConsumer.cpp \
+	GLConsumer.cpp \
+	GraphicBufferAlloc.cpp \
+	GuiConfig.cpp \
 	IDisplayEventConnection.cpp \
+	IGraphicBufferAlloc.cpp \
+	IGraphicBufferProducer.cpp \
 	ISensorEventConnection.cpp \
 	ISensorServer.cpp \
-	ISurfaceTexture.cpp \
+	ISurfaceComposer.cpp \
+	ISurfaceComposerClient.cpp \
+	LayerState.cpp \
 	Sensor.cpp \
 	SensorEventQueue.cpp \
 	SensorManager.cpp \
-	SurfaceTexture.cpp \
-	SurfaceTextureClient.cpp \
-	ISurfaceComposer.cpp \
-	ISurface.cpp \
-	ISurfaceComposerClient.cpp \
-	IGraphicBufferAlloc.cpp \
-	LayerState.cpp \
 	Surface.cpp \
+	SurfaceControl.cpp \
 	SurfaceComposerClient.cpp \
-	DummyConsumer.cpp \
-	CpuConsumer.cpp \
-	BufferItemConsumer.cpp \
-	GuiConfig.cpp
+	SyncFeatures.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
 	libbinder \
@@ -35,27 +36,32 @@ LOCAL_SHARED_LIBRARIES := \
 	libsync \
 	libui \
 	libutils \
+	liblog
 
+ifeq ($(ENABLE_IMG_GRAPHICS),true)
+    LOCAL_C_INCLUDES += \
+		$(TARGET_OUT_HEADERS)/pvr/hal \
+		$(TOP)/frameworks/native/include/media/openmax
+	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
+endif
 
 LOCAL_MODULE:= libgui
 
-ifeq ($(TARGET_BOARD_PLATFORM), omap4)
-	LOCAL_CFLAGS += -DUSE_FENCE_SYNC
+ifeq ($(TARGET_BOARD_PLATFORM), tegra)
+	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
 endif
-ifeq ($(TARGET_BOARD_PLATFORM), s5pc110)
-	LOCAL_CFLAGS += -DUSE_FENCE_SYNC
+ifeq ($(TARGET_BOARD_PLATFORM), tegra3)
+	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
 endif
-ifeq ($(TARGET_BOARD_PLATFORM), exynos5)
+
+ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
 	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
 	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
 endif
-ifneq ($(filter generic%,$(TARGET_DEVICE)),)
-    # Emulator build
-    LOCAL_CFLAGS += -DUSE_FENCE_SYNC
-endif
 
-ifeq ($(TARGET_BOARD_PLATFORM), msm8960)
-	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+# for VPP support on MRFLD only
+ifeq ($(TARGET_HAS_VPP),true)
+    LOCAL_CFLAGS += -DGFX_BUF_EXT
 endif
 
 include $(BUILD_SHARED_LIBRARY)

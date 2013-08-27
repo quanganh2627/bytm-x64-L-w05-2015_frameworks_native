@@ -39,6 +39,10 @@ class DisplayInfo;
 class IDisplayEventConnection;
 class IMemoryHeap;
 
+/*
+ * This class defines the Binder IPC interface for accessing various
+ * SurfaceFlinger features.
+ */
 class ISurfaceComposer: public IInterface {
 public:
     DECLARE_META_INTERFACE(SurfaceComposer);
@@ -47,6 +51,8 @@ public:
     enum {
         eSynchronous = 0x01,
         eAnimation   = 0x02,
+        eTransition  = 0x04,
+        eOrientationEnd  = 0x08
     };
 
     enum {
@@ -86,29 +92,35 @@ public:
      */
     virtual void bootFinished() = 0;
 
-    /* verify that an ISurfaceTexture was created by SurfaceFlinger.
+    /* verify that an IGraphicBufferProducer was created by SurfaceFlinger.
      */
     virtual bool authenticateSurfaceTexture(
-            const sp<ISurfaceTexture>& surface) const = 0;
+            const sp<IGraphicBufferProducer>& surface) const = 0;
 
-    /* Capture the specified screen. requires READ_FRAME_BUFFER permission
-     * This function will fail if there is a secure window on screen.
+    /* triggers screen off and waits for it to complete
+     * requires ACCESS_SURFACE_FLINGER permission.
      */
-    virtual status_t captureScreen(const sp<IBinder>& display, sp<IMemoryHeap>* heap,
-            uint32_t* width, uint32_t* height, PixelFormat* format,
-            uint32_t reqWidth, uint32_t reqHeight,
-            uint32_t minLayerZ, uint32_t maxLayerZ) = 0;
-
-
-    /* triggers screen off and waits for it to complete */
     virtual void blank(const sp<IBinder>& display) = 0;
 
-    /* triggers screen on and waits for it to complete */
+    /* triggers screen on and waits for it to complete
+     * requires ACCESS_SURFACE_FLINGER permission.
+     */
     virtual void unblank(const sp<IBinder>& display) = 0;
 
     /* returns information about a display
      * intended to be used to get information about built-in displays */
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info) = 0;
+
+    /* Capture the specified screen. requires READ_FRAME_BUFFER permission
+     * This function will fail if there is a secure window on screen.
+     */
+    virtual status_t captureScreen(const sp<IBinder>& display,
+            const sp<IGraphicBufferProducer>& producer,
+            uint32_t reqWidth, uint32_t reqHeight,
+            uint32_t minLayerZ, uint32_t maxLayerZ,
+            bool isCpuConsumer) = 0;
+
+    virtual bool isAnimationPermitted() = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -126,11 +138,12 @@ public:
         GET_BUILT_IN_DISPLAY,
         SET_TRANSACTION_STATE,
         AUTHENTICATE_SURFACE,
-        CAPTURE_SCREEN,
         BLANK,
         UNBLANK,
         GET_DISPLAY_INFO,
+        IS_ANIMATION_PERMITTED,
         CONNECT_DISPLAY,
+        CAPTURE_SCREEN,
     };
 
     virtual status_t onTransact(uint32_t code, const Parcel& data,

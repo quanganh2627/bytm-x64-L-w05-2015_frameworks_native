@@ -13,6 +13,8 @@ LOCAL_SRC_FILES:= \
     SensorFusion.cpp \
     SensorInterface.cpp \
     SensorService.cpp \
+    VirtualOrientationSensor.cpp \
+    SecondOrderLowPassFilter.cpp \
 
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SensorService\"
@@ -20,7 +22,9 @@ LOCAL_CFLAGS:= -DLOG_TAG=\"SensorService\"
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	libhardware \
+	libhardware_legacy \
 	libutils \
+	liblog \
 	libbinder \
 	libui \
 	libgui

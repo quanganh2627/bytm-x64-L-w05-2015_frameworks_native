@@ -24,6 +24,7 @@
 #include <gui/BitTube.h>
 #include <gui/IDisplayEventConnection.h>
 #include <gui/DisplayEventReceiver.h>
+#include <cutils/properties.h>
 
 #include <utils/Errors.h>
 #include <utils/String8.h>
@@ -38,10 +39,13 @@ namespace android {
 
 EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
     : mFlinger(flinger),
+      mLastVSyncTimestamp(0),
       mUseSoftwareVSync(false),
-      mDebugVsyncEnabled(false) {
+      mLastVSyncDisplayType(-1),
+      mDebugVsyncEnabled(false),
+      mVsyncDisabled(false){
 
-    for (int32_t i=0 ; i<HWC_DISPLAY_TYPES_SUPPORTED ; i++) {
+    for (int32_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
         mVSyncEvent[i].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
         mVSyncEvent[i].header.id = 0;
         mVSyncEvent[i].header.timestamp = 0;
@@ -50,6 +54,9 @@ EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
 }
 
 void EventThread::onFirstRef() {
+    char vsyncValue[32] = {'\0'};
+    if (property_get("vsync.disable", vsyncValue, NULL))
+        mVsyncDisabled = atoi(vsyncValue);
     run("EventThread", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
 }
 
@@ -88,8 +95,18 @@ void EventThread::requestNextVsync(
     Mutex::Autolock _l(mLock);
     if (connection->count < 0) {
         connection->count = 0;
+        connection->mLastRequestTimestamp = systemTime(CLOCK_MONOTONIC);
+        if (mVsyncDisabled) {
+            // FIXME: how do we decide which display id the fake
+            // vsync came from ?
+            mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
+            mVSyncEvent[0].header.id = HWC_DISPLAY_PRIMARY;
+            mVSyncEvent[0].header.timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+            mVSyncEvent[0].vsync.count++;
+        }
         mCondition.broadcast();
     }
+
 }
 
 void EventThread::onScreenReleased() {
@@ -112,11 +129,11 @@ void EventThread::onScreenAcquired() {
 
 
 void EventThread::onVSyncReceived(int type, nsecs_t timestamp) {
-    ALOGE_IF(type >= HWC_DISPLAY_TYPES_SUPPORTED,
-            "received event for an invalid display (id=%d)", type);
+    ALOGE_IF(type >= HWC_NUM_DISPLAY_TYPES,
+            "received vsync event for an invalid display (id=%d)", type);
 
     Mutex::Autolock _l(mLock);
-    if (type < HWC_DISPLAY_TYPES_SUPPORTED) {
+    if (type < HWC_NUM_DISPLAY_TYPES) {
         mVSyncEvent[type].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
         mVSyncEvent[type].header.id = type;
         mVSyncEvent[type].header.timestamp = timestamp;
@@ -126,11 +143,11 @@ void EventThread::onVSyncReceived(int type, nsecs_t timestamp) {
 }
 
 void EventThread::onHotplugReceived(int type, bool connected) {
-    ALOGE_IF(type >= HWC_DISPLAY_TYPES_SUPPORTED,
-            "received event for an invalid display (id=%d)", type);
+    ALOGE_IF(type >= HWC_NUM_DISPLAY_TYPES,
+            "received hotplug event for an invalid display (id=%d)", type);
 
     Mutex::Autolock _l(mLock);
-    if (type < HWC_DISPLAY_TYPES_SUPPORTED) {
+    if (type < HWC_NUM_DISPLAY_TYPES) {
         DisplayEventReceiver::Event event;
         event.header.type = DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG;
         event.header.id = type;
@@ -177,6 +194,8 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 {
     Mutex::Autolock _l(mLock);
     Vector< sp<EventThread::Connection> > signalConnections;
+    nsecs_t currentVSyncTimestamp = 0;
+    int     currentVSyncDisplayType = -1;
 
     do {
         bool eventPending = false;
@@ -184,10 +203,12 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 
         size_t vsyncCount = 0;
         nsecs_t timestamp = 0;
-        for (int32_t i=0 ; i<HWC_DISPLAY_TYPES_SUPPORTED ; i++) {
+        for (int32_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
             timestamp = mVSyncEvent[i].header.timestamp;
             if (timestamp) {
                 // we have a vsync event to dispatch
+                currentVSyncTimestamp = timestamp;
+                currentVSyncDisplayType = i;
                 *event = mVSyncEvent[i];
                 mVSyncEvent[i].header.timestamp = 0;
                 vsyncCount = mVSyncEvent[i].vsync.count;
@@ -299,6 +320,9 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
         }
     } while (signalConnections.isEmpty());
 
+    mLastVSyncTimestamp = currentVSyncTimestamp;
+    mLastVSyncDisplayType = currentVSyncDisplayType;
+
     // here we're guaranteed to have a timestamp and some connections to signal
     // (The connections might have dropped out of mDisplayEventConnections
     // while we were asleep, but we'll still have strong references to them.)
@@ -329,11 +353,15 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
     result.appendFormat("  numListeners=%u,\n  events-delivered: %u\n",
             mDisplayEventConnections.size(),
             mVSyncEvent[HWC_DISPLAY_PRIMARY].vsync.count);
+    result.appendFormat("  VSYNC came %lldus ago, display type is %d.\n",
+            ((systemTime(CLOCK_MONOTONIC) - mLastVSyncTimestamp)/1000), mLastVSyncDisplayType);
     for (size_t i=0 ; i<mDisplayEventConnections.size() ; i++) {
         sp<Connection> connection =
                 mDisplayEventConnections.itemAt(i).promote();
-        result.appendFormat("    %p: count=%d\n",
-                connection.get(), connection!=NULL ? connection->count : 0);
+        result.appendFormat("    %p: count=%d, requested: %lldus ago.\n",
+                connection.get(), connection!=NULL ? connection->count : 0,
+                (connection->mLastRequestTimestamp ?
+                ((systemTime(CLOCK_MONOTONIC)-connection->mLastRequestTimestamp)/1000) : 0));
     }
 }
 
@@ -341,7 +369,7 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
 
 EventThread::Connection::Connection(
         const sp<EventThread>& eventThread)
-    : count(-1), mEventThread(eventThread), mChannel(new BitTube())
+    : count(-1), mEventThread(eventThread), mChannel(new BitTube()), mLastRequestTimestamp(0)
 {
 }
 
