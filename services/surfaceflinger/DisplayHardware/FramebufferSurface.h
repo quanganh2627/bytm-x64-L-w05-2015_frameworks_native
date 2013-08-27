@@ -39,7 +39,6 @@ public:
     bool isUpdateOnDemand() const { return false; }
     status_t setUpdateRectangle(const Rect& updateRect);
     status_t compositionComplete();
-    status_t setFramecount(int cmd, int count, int x, int y);
 
     virtual void dump(String8& result);
 

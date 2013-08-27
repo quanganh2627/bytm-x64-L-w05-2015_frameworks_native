@@ -432,58 +432,10 @@ void EGLAPI eglBeginFrame(EGLDisplay dpy, EGLSurface surface) {
 // Contexts
 // ----------------------------------------------------------------------------
 
-#define NAME_LEN 128
-char* getCurrentProcessName(char* name, int* len) {
-        char line[100];
-        int  fd;
-        int  ret;
-
-        if(name == NULL) {
-            return NULL;
-        }
-
-        sprintf( line, "/proc/%d/cmdline", getpid() );
-        fd = open( line, O_RDONLY );
-        if( -1 == fd ) {
-                LOGD("wrapper- getCurrentProcessName open file %s failed", line);
-                return NULL;
-        }
-
-        ret = read( fd, name, NAME_LEN );
-        if( ret < 0 ) {
-                LOGD("wrapper- getCurrentProcessName read file %s failed.", line);
-                close(fd);
-                return NULL;
-        }
-
-        close(fd);
-        return name;
-}
-
-int isProcess(char* target) {
-        char cur[NAME_LEN], tar[NAME_LEN];
-        int  cur_len, tar_len;
-        char* cn = getCurrentProcessName(cur, &cur_len);
-
-        if(cn == NULL) {
-            return 0;
-        }
-
-        return !strcmp( target, cn );
-}
-
-
 EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
                             EGLContext share_list, const EGLint *attrib_list)
 {
     clearError();
-
-    EGLint hack_context_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-    if(isProcess("com.gameloft.android.ANMP.GloftBPHM.ML"))
-    {
-        attrib_list = hack_context_attribs;
-    }
-
 
     egl_connection_t* cnx = NULL;
     const egl_display_ptr dp = validate_display_connection(dpy, cnx);
@@ -808,8 +760,8 @@ __eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname)
 
             egl_connection_t* const cnx = &gEGLImpl;
             if (cnx->dso && cnx->egl.eglGetProcAddress) {
+                found = true;
                 // Extensions are independent of the bound context
-                addr =
                 cnx->hooks[egl_connection_t::GLESv1_INDEX]->ext.extensions[slot] =
                 cnx->hooks[egl_connection_t::GLESv2_INDEX]->ext.extensions[slot] =
 #if EGL_TRACE
@@ -817,13 +769,10 @@ __eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname)
                 gHooksTrace.ext.extensions[slot] =
 #endif
                         cnx->egl.eglGetProcAddress(procname);
-                if (addr) found = true;
             }
 
             if (found) {
-#if defined (__arm__)
                 addr = gExtensionForwarders[slot];
-#endif
                 sGLExtentionMap.add(name, addr);
                 sGLExtentionSlot++;
             }

@@ -129,7 +129,7 @@ HWComposer::HWComposer(
     }
 
     // these display IDs are always reserved
-    for (size_t i=0 ; i<MAX_DISPLAYS ; i++) {
+    for (size_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
         mAllocatedDisplayIDs.markBit(i);
     }
 
@@ -370,7 +370,7 @@ status_t HWComposer::queryDisplayProperties(int disp) {
     }
 
     // FIXME: what should we set the format to?
-    mDisplayData[disp].format = HAL_PIXEL_FORMAT_BGRA_8888;
+    mDisplayData[disp].format = HAL_PIXEL_FORMAT_RGBA_8888;
     mDisplayData[disp].connected = true;
     if (mDisplayData[disp].xdpi == 0.0f || mDisplayData[disp].ydpi == 0.0f) {
         // is there anything smarter we can do?
@@ -522,8 +522,6 @@ status_t HWComposer::createWorkList(int32_t id, size_t numLayers) {
         disp.list->retireFenceFd = -1;
         disp.list->flags = HWC_GEOMETRY_CHANGED;
         disp.list->numHwLayers = numLayers;
-        if (!mFlinger->queryRotationIsFinished())
-            disp.list->flags |= HWC_ROTATION_IN_PROGRESS;
     }
     return NO_ERROR;
 }
@@ -696,7 +694,7 @@ status_t HWComposer::acquire(int disp) {
 
 void HWComposer::disconnectDisplay(int disp) {
     LOG_ALWAYS_FATAL_IF(disp < 0 || disp == HWC_DISPLAY_PRIMARY);
-    if (disp >= MAX_DISPLAYS) {
+    if (disp >= HWC_NUM_DISPLAY_TYPES) {
         // nothing to do for these yet
         return;
     }
@@ -714,7 +712,7 @@ int HWComposer::getVisualID() const {
         // FIXME: temporary hack until HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
         // is supported by the implementation. we can only be in this case
         // if we have HWC 1.1
-        return HAL_PIXEL_FORMAT_BGRA_8888;
+        return HAL_PIXEL_FORMAT_RGBA_8888;
         //return HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     } else {
         return mFbDev->format;
@@ -743,23 +741,6 @@ int HWComposer::fbCompositionComplete() {
 
     if (mFbDev->compositionComplete) {
         return mFbDev->compositionComplete(mFbDev);
-    } else {
-        return INVALID_OPERATION;
-    }
-}
-
-int HWComposer::setFramecount(int cmd, int count, int x, int y) {
-    if (mHwc && hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
-       if (mHwc->reserved_proc[1]) {
-            int (*setFramecount)(struct hwc_composer_device_1*, int, int, int, int) =
-                (int (*)(hwc_composer_device_1*, int, int, int, int))mHwc->reserved_proc[1];
-            setFramecount(mHwc, cmd, count, x, y);
-        }
-        return NO_ERROR;
-    }
-
-    if (mFbDev->compositionComplete) {
-        return mFbDev->setFramecount(cmd, count, x, y);
     } else {
         return INVALID_OPERATION;
     }
@@ -843,16 +824,6 @@ public:
         } else {
             getLayer()->flags &= ~HWC_SKIP_LAYER;
         }
-    }
-    virtual void setTrickMode(bool on) {
-        if (on) {
-            getLayer()->flags |= HWC_TRICK_MODE;
-        } else {
-            getLayer()->flags &= ~HWC_TRICK_MODE;
-        }
-    }
-    virtual void setVideoSessionID(uint32_t sessionID) {
-        getLayer()->flags |= sessionID;
     }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;

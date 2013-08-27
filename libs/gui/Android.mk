@@ -36,14 +36,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libui \
 	libutils \
 
-ifeq ($(ENABLE_IMG_GRAPHICS), true)
-ifeq ($(BOARD_USES_WRS_OMXIL_CORE),true)
-	LOCAL_C_INCLUDES += \
-            $(TARGET_OUT_HEADERS)/pvr/hal \
-            $(TARGET_OUT_HEADERS)/khronos/openmax
-	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
-endif
-endif
 
 LOCAL_MODULE:= libgui
 
@@ -64,16 +56,6 @@ endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), msm8960)
 	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
-	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
-	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
-endif
-
-# for VPP support on MRFLD only
-ifeq ($(TARGET_HAS_VPP),true)
-    LOCAL_CFLAGS += -DGFX_BUF_EXT
 endif
 
 include $(BUILD_SHARED_LIBRARY)

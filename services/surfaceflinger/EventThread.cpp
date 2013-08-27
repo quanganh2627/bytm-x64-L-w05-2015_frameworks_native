@@ -24,7 +24,6 @@
 #include <gui/BitTube.h>
 #include <gui/IDisplayEventConnection.h>
 #include <gui/DisplayEventReceiver.h>
-#include <cutils/properties.h>
 
 #include <utils/Errors.h>
 #include <utils/String8.h>
@@ -39,13 +38,8 @@ namespace android {
 
 EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
     : mFlinger(flinger),
-      mLastVSyncTimestamp(0),
       mUseSoftwareVSync(false),
-      mLastVSyncDisplayType(-1),
-      mDebugVsyncEnabled(false),
-      mVsyncDisabled(false){
-
-      cpu_set_t cpuset;
+      mDebugVsyncEnabled(false) {
 
     for (int32_t i=0 ; i<HWC_DISPLAY_TYPES_SUPPORTED ; i++) {
         mVSyncEvent[i].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
@@ -53,17 +47,9 @@ EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
         mVSyncEvent[i].header.timestamp = 0;
         mVSyncEvent[i].vsync.count =  0;
     }
-    // set affinity on core 1 (cpu0 or cpu1), othogonal to GLThread on core 2 (cpu2 or cpu3)
-    CPU_ZERO(&cpuset);
-    CPU_SET(0, &cpuset);
-    CPU_SET(1, &cpuset);
-    sched_setaffinity(gettid(), sizeof(cpuset), &cpuset);
 }
 
 void EventThread::onFirstRef() {
-    char vsyncValue[32] = {'\0'};
-    if (property_get("vsync.disable", vsyncValue, NULL))
-        mVsyncDisabled = atoi(vsyncValue);
     run("EventThread", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
 }
 
@@ -102,21 +88,8 @@ void EventThread::requestNextVsync(
     Mutex::Autolock _l(mLock);
     if (connection->count < 0) {
         connection->count = 0;
-        connection->mLastRequestTimestamp = systemTime(CLOCK_MONOTONIC);
-        if(Connection::s_oldestUnreponsedRequestTimestamp == 0) {
-            Connection::s_oldestUnreponsedRequestTimestamp = connection->mLastRequestTimestamp;
-        }
-        if (mVsyncDisabled) {
-            // FIXME: how do we decide which display id the fake
-            // vsync came from ?
-            mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
-            mVSyncEvent[0].header.id = HWC_DISPLAY_PRIMARY;
-            mVSyncEvent[0].header.timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
-            mVSyncEvent[0].vsync.count++;
-        }
         mCondition.broadcast();
     }
-
 }
 
 void EventThread::onScreenReleased() {
@@ -204,8 +177,6 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 {
     Mutex::Autolock _l(mLock);
     Vector< sp<EventThread::Connection> > signalConnections;
-    nsecs_t currentVSyncTimestamp = 0;
-    int     currentVSyncDisplayType = -1;
 
     do {
         bool eventPending = false;
@@ -217,8 +188,6 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
             timestamp = mVSyncEvent[i].header.timestamp;
             if (timestamp) {
                 // we have a vsync event to dispatch
-                currentVSyncTimestamp = timestamp;
-                currentVSyncDisplayType = i;
                 *event = mVSyncEvent[i];
                 mVSyncEvent[i].header.timestamp = 0;
                 vsyncCount = mVSyncEvent[i].vsync.count;
@@ -330,20 +299,6 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
         }
     } while (signalConnections.isEmpty());
 
-    mLastVSyncTimestamp = currentVSyncTimestamp;
-    mLastVSyncDisplayType = currentVSyncDisplayType;
-
-
-    //take care are only single shot request mode
-    if(Connection::s_oldestUnreponsedRequestTimestamp != 0){
-        const nsecs_t VSYNC_WARNING_THRESHOLD = 100000000; //100ms
-        nsecs_t syncResponseinterval = systemTime(CLOCK_MONOTONIC) - 
-            Connection::s_oldestUnreponsedRequestTimestamp;
-        if( syncResponseinterval > VSYNC_WARNING_THRESHOLD ){
-               ALOGW(" warning! VSYNC take %lld ms to deliver!" ,syncResponseinterval/1000000);
-        }
-        Connection::s_oldestUnreponsedRequestTimestamp = 0;
-    }
     // here we're guaranteed to have a timestamp and some connections to signal
     // (The connections might have dropped out of mDisplayEventConnections
     // while we were asleep, but we'll still have strong references to them.)
@@ -374,26 +329,19 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
     result.appendFormat("  numListeners=%u,\n  events-delivered: %u\n",
             mDisplayEventConnections.size(),
             mVSyncEvent[HWC_DISPLAY_PRIMARY].vsync.count);
-    result.appendFormat("  VSYNC came %lldus ago, display type is %d.\n",
-            ((systemTime(CLOCK_MONOTONIC) - mLastVSyncTimestamp)/1000), mLastVSyncDisplayType);
     for (size_t i=0 ; i<mDisplayEventConnections.size() ; i++) {
         sp<Connection> connection =
                 mDisplayEventConnections.itemAt(i).promote();
-        if (connection != NULL) {
-            result.appendFormat("    %p: count=%d, requested: %lldus\n",
-                    connection.get(), connection->count,
-                    (connection->mLastRequestTimestamp ?
-		            ((systemTime(CLOCK_MONOTONIC)-connection->mLastRequestTimestamp)/1000) : 0));
-        }
+        result.appendFormat("    %p: count=%d\n",
+                connection.get(), connection!=NULL ? connection->count : 0);
     }
 }
 
 // ---------------------------------------------------------------------------
-nsecs_t EventThread::Connection::s_oldestUnreponsedRequestTimestamp = 0;
 
 EventThread::Connection::Connection(
         const sp<EventThread>& eventThread)
-    : count(-1), mEventThread(eventThread), mChannel(new BitTube()), mLastRequestTimestamp(0)
+    : count(-1), mEventThread(eventThread), mChannel(new BitTube())
 {
 }
 

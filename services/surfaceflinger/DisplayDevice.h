@@ -116,7 +116,6 @@ public:
 
     void swapBuffers(HWComposer& hwc) const;
     status_t compositionComplete() const;
-    status_t setFramecount(int cmd, int count, int x, int y) const;
     
     // called after h/w composer has completed its set() call
     void onSwapBuffersCompleted(HWComposer& hwc) const;

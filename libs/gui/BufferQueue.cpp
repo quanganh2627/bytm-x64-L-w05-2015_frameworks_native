@@ -31,13 +31,6 @@
 #include <utils/Log.h>
 #include <gui/SurfaceTexture.h>
 #include <utils/Trace.h>
-#ifdef USE_IMG_GRAPHICS
-#include <hal_public.h>
-#include <OMX_IVCommon.h>
-#endif
-
-static const nsecs_t dequeueTimeout = seconds(5);
-
 
 // Macros for including the BufferQueue name in log messages
 #define ST_LOGV(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
@@ -357,10 +350,7 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
             // the max buffer count to change.
             tryAgain = found == INVALID_BUFFER_SLOT;
             if (tryAgain) {
-                if (mDequeueCondition.waitRelative(mMutex, dequeueTimeout)) {
-                    ST_LOGE("dequeueBuffer: time out and will free all buffer!");
-                    freeAllBuffersLocked();
-                }
+                mDequeueCondition.wait(mMutex);
             }
         }
 
@@ -413,7 +403,6 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>& outFence,
 
     if (returnFlags & ISurfaceTexture::BUFFER_NEEDS_REALLOCATION) {
         status_t error;
-        mGraphicBufferAlloc->acquireBufferReferenceSlot(*outBuf);
         sp<GraphicBuffer> graphicBuffer(
                 mGraphicBufferAlloc->createGraphicBuffer(
                         w, h, format, usage, &error));
@@ -499,18 +488,6 @@ status_t BufferQueue::queueBuffer(int buf,
     sp<Fence> fence;
 
     input.deflate(&timestamp, &crop, &scalingMode, &transform, &fence);
-    bool trickModeFlag = false;
-    if (scalingMode & (1 << 30)) {
-        scalingMode &= ~(1 << 30);
-        trickModeFlag = true;
-    }
-    uint32_t sessionId = 0;
-    if (scalingMode & (1 << 29)) {
-        sessionId = (1 << 29);
-        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
-        scalingMode &= ~(1 << 29);
-        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
-    }
 
     ST_LOGV("queueBuffer: slot=%d time=%#llx crop=[%d,%d,%d,%d] tr=%#x "
             "scale=%s",
@@ -558,54 +535,20 @@ status_t BufferQueue::queueBuffer(int buf,
             // be consumed.
             listener = mConsumerListener;
         } else {
-            bool useOriginalAsyncMode = true;
-#ifdef USE_IMG_GRAPHICS
-            //Only for HW decoder format
-            if (mConnectedApi == NATIVE_WINDOW_API_MEDIA &&
-                    mSlots[buf].mGraphicBuffer->handle != NULL) {
-                IMG_native_handle_t *nativeBuffer =
-                    (IMG_native_handle_t *)mSlots[buf].mGraphicBuffer->handle;
-                if (nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar ||
-                        nativeBuffer->iFormat == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled)
-                    useOriginalAsyncMode = false;
-            }
-#endif
-            if (!useOriginalAsyncMode) {
-                // Here we couldn't use original asynchronous mode for video playback,
-                // because there is a timing sequence issue between
-                // video queue buffer and SurfaceFlinger's vsync.
-                // Video render is different with GUI,
-                // GUI will wait for a vsync from HWC, then queue buffer.
-                // So increase buffer's number to 2 to avoid buffer overwrite,
-                // and 1 video frame latency is acceptable for A/V sync.
-                if (mQueue.size() <= 1) {
-                    mQueue.push_back(buf);
+            // In asynchronous mode we only keep the most recent buffer.
+            if (mQueue.empty()) {
+                mQueue.push_back(buf);
 
-                    listener = mConsumerListener;
-                } else {
-                    // clear all queued buffers
-                    Fifo::iterator i(mQueue.begin());
-                    while(i != mQueue.end())
-                        mSlots[*i++].mBufferState = BufferSlot::FREE;
-                    mQueue.clear();
-                    mQueue.push_back(buf);
-                }
+                // Asynchronous mode only signals that a frame should be
+                // consumed if no previous frame was pending. If a frame were
+                // pending then the consumer would have already been notified.
+                listener = mConsumerListener;
             } else {
-                // In asynchronous mode we only keep the most recent buffer.
-                if (mQueue.empty()) {
-                    mQueue.push_back(buf);
-
-                    // Asynchronous mode only signals that a frame should be
-                    // consumed if no previous frame was pending. If a frame were
-                    // pending then the consumer would have already been notified.
-                    listener = mConsumerListener;
-                } else {
-                    Fifo::iterator front(mQueue.begin());
-                    // buffer currently queued is freed
-                    mSlots[*front].mBufferState = BufferSlot::FREE;
-                    // and we record the new buffer index in the queued list
-                    *front = buf;
-                }
+                Fifo::iterator front(mQueue.begin());
+                // buffer currently queued is freed
+                mSlots[*front].mBufferState = BufferSlot::FREE;
+                // and we record the new buffer index in the queued list
+                *front = buf;
             }
         }
 
@@ -613,8 +556,6 @@ status_t BufferQueue::queueBuffer(int buf,
         mSlots[buf].mCrop = crop;
         mSlots[buf].mTransform = transform;
         mSlots[buf].mFence = fence;
-        mSlots[buf].mTrickMode = trickModeFlag;
-        mSlots[buf].mVideoSessionID = sessionId;
 
         switch (scalingMode) {
             case NATIVE_WINDOW_SCALING_MODE_FREEZE:
@@ -833,7 +774,6 @@ void BufferQueue::dump(String8& result, const char* prefix,
 void BufferQueue::freeBufferLocked(int slot) {
     ST_LOGV("freeBufferLocked: slot=%d", slot);
     mSlots[slot].mGraphicBuffer = 0;
-    mGraphicBufferAlloc->releaseBufferReferenceSlot(slot);
     if (mSlots[slot].mBufferState == BufferSlot::ACQUIRED) {
         mSlots[slot].mNeedsCleanupOnRelease = true;
     }
@@ -900,15 +840,11 @@ status_t BufferQueue::acquireBuffer(BufferItem *buffer) {
         buffer->mTimestamp = mSlots[buf].mTimestamp;
         buffer->mBuf = buf;
         buffer->mFence = mSlots[buf].mFence;
-        buffer->mTrickMode = mSlots[buf].mTrickMode;
-        buffer->mVideoSessionID = mSlots[buf].mVideoSessionID;
 
         mSlots[buf].mAcquireCalled = true;
         mSlots[buf].mNeedsCleanupOnRelease = false;
         mSlots[buf].mBufferState = BufferSlot::ACQUIRED;
         mSlots[buf].mFence.clear();
-        mSlots[buf].mTrickMode = false;
-        mSlots[buf].mVideoSessionID = 0;
 
         mQueue.erase(front);
         mDequeueCondition.broadcast();
@@ -983,7 +919,7 @@ status_t BufferQueue::consumerDisconnect() {
     return OK;
 }
 
-status_t BufferQueue::getReleasedBuffers(uint64_t* slotMask) {
+status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
     ST_LOGV("getReleasedBuffers");
     Mutex::Autolock lock(mMutex);
 
@@ -992,10 +928,10 @@ status_t BufferQueue::getReleasedBuffers(uint64_t* slotMask) {
         return NO_INIT;
     }
 
-    uint64_t mask = 0;
+    uint32_t mask = 0;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
         if (!mSlots[i].mAcquireCalled) {
-            mask |= (1ULL << i);
+            mask |= 1 << i;
         }
     }
     *slotMask = mask;
@@ -1042,17 +978,13 @@ status_t BufferQueue::setMaxAcquiredBufferCount(int maxAcquiredBuffers) {
 
 void BufferQueue::freeAllBuffersExceptHeadLocked() {
     int head = -1;
-    int head2 = -1;
     if (!mQueue.empty()) {
         Fifo::iterator front(mQueue.begin());
         head = *front;
-	if (mQueue.size() > 1){
-		head2 = *(++front);
-	}
     }
     mBufferHasBeenQueued = false;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
-        if (i != head && i != head2) {
+        if (i != head) {
             freeBufferLocked(i);
         }
     }

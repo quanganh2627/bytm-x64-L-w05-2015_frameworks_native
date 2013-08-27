@@ -72,8 +72,6 @@ public:
             GLenum texTarget = GL_TEXTURE_EXTERNAL_OES, bool useFenceSync = true,
             const sp<BufferQueue> &bufferQueue = 0);
 
-    virtual ~SurfaceTexture();
-
     // updateTexImage sets the image contents of the target texture to that of
     // the most recently queued buffer.
     //
@@ -168,12 +166,6 @@ public:
     // isSynchronousMode returns whether the SurfaceTexture is currently in
     // synchronous mode.
     bool isSynchronousMode() const;
-
-    // getTrickMode returns whether video is in trick playback
-    bool getTrickMode() const;
-
-    // getVideoSessionID returns video session ID
-    uint32_t getVideoSessionID() const;
 
     // set the name of the SurfaceTexture that will be used to identify it in
     // log messages.
@@ -402,13 +394,6 @@ private:
     // It is set to false by detachFromContext, and then set to true again by
     // attachToContext.
     bool mAttached;
-
-    // mTrickMode indicates whether the current surface is used for trick
-    // playback.
-    bool mTrickMode;
-
-    // mVideoSessionID indicates video session ID
-    uint32_t mVideoSessionID;
 };
 
 // ----------------------------------------------------------------------------

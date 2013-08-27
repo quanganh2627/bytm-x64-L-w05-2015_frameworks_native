@@ -88,20 +88,12 @@ SurfaceFlinger::SurfaceFlinger()
         mTransactionFlags(0),
         mTransactionPending(false),
         mAnimTransactionPending(false),
-        mTransitionOn(true),
-        mOrientationEnd(true),
-        mDisplayScaleState(0),
         mLayersRemoved(false),
         mRepaintEverything(0),
         mBootTime(systemTime()),
         mVisibleRegionsDirty(false),
         mHwWorkListDirty(false),
         mDebugRegion(0),
-        mDebugFrameCountFlag(0),
-        mDebugFrameCountIncFlag(0),
-        mDebugFrameCountXCoordinate(0),
-        mDebugFrameCountYCoordinate(0),
-        mDebugFrameCount(0),
         mDebugDDMS(0),
         mDebugDisableHWC(0),
         mDebugDisableTransformHint(0),
@@ -109,11 +101,7 @@ SurfaceFlinger::SurfaceFlinger()
         mLastSwapBufferTime(0),
         mDebugInTransaction(0),
         mLastTransactionTime(0),
-        mBootFinished(false),
-        mAnimFlag(true),
-        mMutexLocked(false),
-        mSurfaceFlingerThreadId(0),
-        mBypassComposition(false)
+        mBootFinished(false)
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -270,11 +258,7 @@ status_t SurfaceFlinger::selectConfigForAttribute(
                 EGLint value = 0;
                 eglGetConfigAttrib(dpy, configs[i], attribute, &value);
                 if (wanted == value) {
-#if !(defined ENABLE_INTEL_CONFIG_18BPP)
                     *outConfig = configs[i];
-#else
-                    *outConfig = configs[0]; /* this can be done better */
-#endif
                     delete [] configs;
                     return NO_ERROR;
                 }
@@ -357,28 +341,6 @@ EGLConfig SurfaceFlinger::selectEGLConfig(EGLDisplay display, EGLint nativeVisua
     attribs[EGL_GREEN_SIZE]                 = 8;
     attribs[EGL_BLUE_SIZE]                  = 8;
 
-#if (defined ENABLE_INTEL_CONFIG_18BPP)
-    // allow less than 24-bit color; the non-gpu-accelerated emulator only
-    // supports 16-bit color
-    attribs.remove(EGL_RED_SIZE);
-    attribs.remove(EGL_GREEN_SIZE);
-    attribs.remove(EGL_BLUE_SIZE);
-    attribs.remove(EGL_FRAMEBUFFER_TARGET_ANDROID);
-    attribs.remove(EGL_RECORDABLE_ANDROID);
-    err = selectConfigForAttribute(display, attribs,
-            EGL_NATIVE_VISUAL_ID, nativeVisualId, &config);
-    if (!err) {
-        ALOGE("JB: setting to 565 worked with all removed in SurfaceFlinger::selectEGLConfig");
-        EGLint r,g,b,a;
-        eglGetConfigAttrib(display, config, EGL_RED_SIZE,   &r);
-        eglGetConfigAttrib(display, config, EGL_GREEN_SIZE, &g);
-        eglGetConfigAttrib(display, config, EGL_BLUE_SIZE,  &b);
-        eglGetConfigAttrib(display, config, EGL_ALPHA_SIZE, &a);
-        ALOGE("JB: EGLSurface: %d-%d-%d-%d, config=%p", r, g, b, a, config);
-        goto success;
-    }
-#endif /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-
     err = selectConfigForAttribute(display, attribs, EGL_NONE, EGL_NONE, &config);
     if (!err)
         goto success;
@@ -455,13 +417,7 @@ void SurfaceFlinger::initializeGL(EGLDisplay display) {
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
     glEnableClientState(GL_VERTEX_ARRAY);
     glShadeModel(GL_FLAT);
-
-#if !(defined ENABLE_INTEL_CONFIG_18BPP)
     glDisable(GL_DITHER);
-#else /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-    glEnable(GL_DITHER); /* turn on our color calculator state */
-#endif /* if (defined ENABLE_INTEL_CONFIG_18BPP) */
-
     glDisable(GL_CULL_FACE);
 
     struct pack565 {
@@ -578,13 +534,11 @@ status_t SurfaceFlinger::readyToRun()
     // start boot animation
     startBootAnim();
 
-    mSurfaceFlingerThreadId = getThreadId();
-
     return NO_ERROR;
 }
 
 int32_t SurfaceFlinger::allocateHwcDisplayId(DisplayDevice::DisplayType type) {
-    return (uint32_t(type) <= DisplayDevice::DISPLAY_VIRTUAL) ?
+    return (uint32_t(type) < DisplayDevice::NUM_DISPLAY_TYPES) ?
             type : mHwc->allocateDisplayId();
 }
 
@@ -716,8 +670,6 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
     info->xdpi = xdpi;
     info->ydpi = ydpi;
     info->fps = float(1e9 / hwc.getRefreshPeriod(type));
-    mDebugFrameCountXCoordinate = info->w;
-    mDebugFrameCountYCoordinate = info->h;
 
     // All non-virtual displays are currently considered secure.
     info->secure = true;
@@ -797,7 +749,6 @@ void SurfaceFlinger::onHotplugReceived(int type, bool connected) {
             mCurrentState.displays.removeItem(mDefaultDisplays[type]);
         } else {
             DisplayDeviceState info((DisplayDevice::DisplayType)type);
-            info.scale = mDisplayScaleState;
             mCurrentState.displays.add(mDefaultDisplays[type], info);
         }
         setTransactionFlags(eDisplayTransactionNeeded);
@@ -987,24 +938,6 @@ void SurfaceFlinger::setUpHWComposer() {
                             if (mDebugDisableHWC || mDebugRegion) {
                                 cur->setSkip(true);
                             }
-                            // when rotation really happens on layers, set
-                            // mBypassCompostion back to be false.
-                            if (i==0 && mBypassComposition &&
-                                hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
-                                const LayerBase::State& s(layer->drawingState());
-                                const uint32_t finalTransform =
-                                                    s.transform.getOrientation();
-                                if (finalTransform & Transform::ROT_INVALID) {
-                                    mBypassComposition = false;
-                                }
-                            }
-                            // when transition scale is disabled, and orientation
-                            // complete, set mBypassCompostion to be false too.
-                            if (!mTransitionOn &&
-                                mOrientationEnd &&
-                                mBypassComposition) {
-                                mBypassComposition = false;
-                            }
                         }
                     }
                 }
@@ -1037,25 +970,11 @@ void SurfaceFlinger::setUpHWComposer() {
     }
 }
 
-bool SurfaceFlinger::queryRotationIsFinished() {
-    Mutex::Autolock _l(mStateLock);
-
-    return mOrientationEnd;
-}
-
 void SurfaceFlinger::doComposition() {
     ATRACE_CALL();
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         const sp<DisplayDevice>& hw(mDisplays[dpy]);
-        // Bypass composition on external display when
-        // orientation changed but rotation has not happen
-        // on layers. It is used to optimize user experience
-        // of external display rotation animation.
-        if (mBypassComposition &&
-            hw->getDisplayType() == DisplayDevice::DISPLAY_EXTERNAL)
-            continue;
-
         if (hw->canDraw()) {
             // transform the dirty region into this screen's coordinate space
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
@@ -1071,16 +990,6 @@ void SurfaceFlinger::doComposition() {
         hw->compositionComplete();
     }
     postFramebuffer();
-    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
-    if (CC_UNLIKELY(mDebugFrameCountFlag)) {
-        hw->setFramecount(eUpdateCursorDbg, (mDebugFrameCount%16), 0, 0);
-        if (CC_UNLIKELY(mDebugFrameCountIncFlag))
-            mDebugFrameCount++;
-        if (mDebugFrameCount >= 9999)
-            mDebugFrameCount = 0;
-        ATRACE_INT("compositionDbg", mDebugFrameCount);
-    }
-
 }
 
 void SurfaceFlinger::postFramebuffer()
@@ -1129,28 +1038,23 @@ void SurfaceFlinger::handleTransaction(uint32_t transactionFlags)
 {
     ATRACE_CALL();
 
-    {
-        // scope for the mutex
-        Mutex::Autolock _l(mStateLock);
-        mMutexLocked = true;
-        const nsecs_t now = systemTime();
-        mDebugInTransaction = now;
+    Mutex::Autolock _l(mStateLock);
+    const nsecs_t now = systemTime();
+    mDebugInTransaction = now;
 
-        // Here we're guaranteed that some transaction flags are set
-        // so we can call handleTransactionLocked() unconditionally.
-        // We call getTransactionFlags(), which will also clear the flags,
-        // with mStateLock held to guarantee that mCurrentState won't change
-        // until the transaction is committed.
+    // Here we're guaranteed that some transaction flags are set
+    // so we can call handleTransactionLocked() unconditionally.
+    // We call getTransactionFlags(), which will also clear the flags,
+    // with mStateLock held to guarantee that mCurrentState won't change
+    // until the transaction is committed.
 
-        transactionFlags = getTransactionFlags(eTransactionMask);
-        handleTransactionLocked(transactionFlags);
+    transactionFlags = getTransactionFlags(eTransactionMask);
+    handleTransactionLocked(transactionFlags);
 
-        mLastTransactionTime = systemTime() - now;
-        mDebugInTransaction = 0;
-        invalidateHwcGeometry();
-        // here the transaction has been committed
-    }
-    mMutexLocked = false;
+    mLastTransactionTime = systemTime() - now;
+    mDebugInTransaction = 0;
+    invalidateHwcGeometry();
+    // here the transaction has been committed
 }
 
 void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
@@ -1233,18 +1137,10 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         }
                         if ((state.orientation != draw[i].orientation)
                                 || (state.viewport != draw[i].viewport)
-                                || (state.frame != draw[i].frame)
-                                || (state.scale != draw[i].scale))
+                                || (state.frame != draw[i].frame))
                         {
-                            Rect frame = state.frame;
-                            Rect viewport = state.viewport;
-                            handleDisplayScaling(state, viewport, frame);
-                            // set mBypassComposition once orientation change
-                            if (state.orientation != draw[i].orientation) {
-                                mBypassComposition = true;
-                            }
                             disp->setProjection(state.orientation,
-                                    viewport, frame);
+                                    state.viewport, state.frame);
                         }
                     }
                 }
@@ -1403,134 +1299,6 @@ void SurfaceFlinger::commitTransaction()
     mTransactionPending = false;
     mAnimTransactionPending = false;
     mTransactionCV.broadcast();
-}
-
-
-bool SurfaceFlinger::isPresentationMode()
-{
-    Mutex::Autolock _l(mStateLock);
-     //if have more than one displayDevice and whose layerStack > 0
-     //we are in presentation mode
-     for (size_t dpy = 0 ; dpy < mDisplays.size() ; dpy++) {
-        const sp<const DisplayDevice>& hw(mDisplays[dpy]);
-        ALOGI("Device %s -> ls %d ", hw->getDisplayName().string(), hw->getLayerStack());
-        if (hw->getLayerStack() > 0) {
-            return true;
-        }
-     }
-
-     return false;
-
-
-}
-
-int SurfaceFlinger::setDisplayScaling(uint32_t scale)
-{
-    Mutex::Autolock _l(mStateLock);
-    int32_t result = NO_ERROR;
-    sp<IBinder> token =
-        getBuiltInDisplay(DisplayDevice::DISPLAY_EXTERNAL);
-    ssize_t dpyIdx = mCurrentState.displays.indexOfKey(token);
-    if (dpyIdx < 0)
-        return BAD_VALUE;
-
-    DisplayDeviceState& disp(mCurrentState.displays.editValueAt(dpyIdx));
-    if (disp.isValid()) {
-         if (disp.scale != scale) {
-             mDisplayScaleState = scale;
-             disp.scale = mDisplayScaleState;
-             setTransactionFlags(eDisplayTransactionNeeded);
-         }
-    } else {
-        result = INVALID_OPERATION;
-    }
-    return result;
-}
-
-void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
-        Rect& viewport, Rect& frame)
-{
-    if (state.type == DisplayDevice::DISPLAY_EXTERNAL) {
-        uint32_t width;
-        uint32_t height;
-        HWComposer& hwc(getHwComposer());
-
-        if (!hwc.isConnected(state.type))
-            return;
-
-        width = hwc.getWidth(state.type);
-        height = hwc.getHeight(state.type);
-
-        switch (state.scaleMode) {
-        case eDisplayScaleFullscreen:
-            frame.left = frame.top = 0;
-            frame.right = width;
-            frame.bottom = height;
-            break;
-        case eDisplayScaleCenter:
-        {
-            int viewWidth;
-            int viewHeight;
-            bool isRot90_270;
-
-            isRot90_270 = (state.orientation == DisplayState::eOrientation90 ||
-                 state.orientation == DisplayState::eOrientation270);
-            if (isRot90_270) {
-                viewWidth = viewport.bottom - viewport.top;
-                viewHeight = viewport.right - viewport.left;
-            } else {
-                viewWidth = viewport.right - viewport.left;
-                viewHeight = viewport.bottom - viewport.top;
-            }
-
-            if (width < viewWidth) {
-                frame.left = 0;
-                frame.right = width;
-                if (isRot90_270) {
-                    viewport.top = 0;
-                    viewport.bottom = width;
-                } else {
-                    viewport.left = 0;
-                    viewport.right = width;
-                }
-            } else {
-                frame.left = (width - viewWidth) / 2;
-                frame.right = (width + viewWidth) / 2;
-            }
-
-            if (height < viewHeight) {
-                frame.top = 0;
-                frame.bottom = height;
-                if (isRot90_270) {
-                    viewport.left = 0;
-                    viewport.right = height;
-                } else {
-                    viewport.top = 0;
-                    viewport.bottom = height;
-                }
-            } else {
-                frame.top = (height - viewHeight) / 2;
-                frame.bottom = (height + viewHeight) / 2;
-            }
-            break;
-        }
-        case eDisplayScaleAspect:
-        case eDisplayScaleNone:
-        default:
-            break;
-        }
-
-        if (state.scaleStepX) {
-            int frameWidth = frame.right - frame.left;
-            frame.left += state.scaleStepX * frameWidth / 100;
-            frame.right -= state.scaleStepX * frameWidth / 100;
-        }
-        if (state.scaleStepY) {
-            int frameHeight = frame.bottom - frame.left;
-            frame.top += state.scaleStepY * frameHeight / 100;
-            frame.bottom -= state.scaleStepY * frameHeight / 100;
-        }
-    }
 }
 
 void SurfaceFlinger::computeVisibleRegions(
@@ -1808,7 +1576,6 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
     const Transform& tr = hw->getTransform();
     if (cur != end) {
         // we're using h/w composer
-        bool needDisableAnimation = false;
         for (size_t i=0 ; i<count && cur!=end ; ++i, ++cur) {
             const sp<LayerBase>& layer(layers[i]);
             const Region clip(dirty.intersect(tr.transform(layer->visibleRegion)));
@@ -1823,8 +1590,6 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
-                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
-                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
@@ -1840,9 +1605,6 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                 }
             }
             layer->setAcquireFence(hw, *cur);
-        }
-        if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
-            mAnimFlag = needDisableAnimation ? false : true;
         }
     } else {
         // we're not using h/w composer
@@ -1899,19 +1661,11 @@ ssize_t SurfaceFlinger::addClientLayer(const sp<Client>& client,
 
 status_t SurfaceFlinger::removeLayer(const sp<LayerBase>& layer)
 {
-    if(alreadyLockedBySurfaceFlingerThread()){
-        ALOGW("mStateLock already locked by surfaceFlingerThread");
-        status_t err = purgatorizeLayer_l(layer);
-        if (err == NO_ERROR)
-           setTransactionFlags(eTransactionNeeded);
-       return err;
-    }else{
-        Mutex::Autolock _l(mStateLock);
-        status_t err = purgatorizeLayer_l(layer);
-        if (err == NO_ERROR)
-            setTransactionFlags(eTransactionNeeded);
-        return err;
-    }
+    Mutex::Autolock _l(mStateLock);
+    status_t err = purgatorizeLayer_l(layer);
+    if (err == NO_ERROR)
+        setTransactionFlags(eTransactionNeeded);
+    return err;
 }
 
 status_t SurfaceFlinger::removeLayer_l(const sp<LayerBase>& layerBase)
@@ -1984,18 +1738,6 @@ void SurfaceFlinger::setTransactionState(
                 break;
             }
         }
-    }
-
-    if (flags & eTransition) {
-        mTransitionOn = true;
-    } else {
-        mTransitionOn = false;
-    }
-
-    if (flags & eOrientationEnd) {
-        mOrientationEnd = true;
-    } else {
-        mOrientationEnd = false;
     }
 
     size_t count = displays.size();
@@ -2347,7 +2089,6 @@ void SurfaceFlinger::onScreenAcquired(const sp<const DisplayDevice>& hw) {
         }
     }
     mVisibleRegionsDirty = true;
-    mBypassComposition = false;
     repaintEverything();
 }
 
@@ -2716,7 +2457,6 @@ bool SurfaceFlinger::startDdmConnection()
 status_t SurfaceFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    sp<const DisplayDevice> hw(getDefaultDisplayDevice());
     switch (code) {
         case CREATE_CONNECTION:
         case SET_TRANSACTION_STATE:
@@ -2749,13 +2489,6 @@ status_t SurfaceFlinger::onTransact(
                 return PERMISSION_DENIED;
             }
             break;
-        }
-         case 1015: //isPresentationMode
-        {
-             bool r = isPresentationMode();
-             ALOGI("is presetation mode %d" , r);
-             reply->writeInt32(r ? 1 : 0);
-             return NO_ERROR;
         }
     }
 
@@ -2815,47 +2548,12 @@ status_t SurfaceFlinger::onTransact(
                 reply->writeInt32(0);
                 reply->writeInt32(mDebugDisableHWC);
                 return NO_ERROR;
-            case 1011:  // SHOW_FRAME_COUNT
-                n = data.readInt32();
-                mDebugFrameCountFlag = n ? n : (mDebugFrameCountFlag ? 0 : 1);
-                mDebugFrameCount = 0;
-                mDebugFrameCountIncFlag = 0;
-                n = data.readInt32();
-                if (n > 0) {
-                   mDebugFrameCountXCoordinate = n;
-                }
-                   n = data.readInt32();
-                if (n > 0) {
-                   mDebugFrameCountYCoordinate = n;
-                }
-                if (mDebugFrameCountFlag) {
-                   hw->setFramecount(eEnableCursorDbg, 0,
-                   mDebugFrameCountXCoordinate, mDebugFrameCountYCoordinate);
-                } else {
-                   hw->setFramecount(eDisableCursorDbg, 0, 0, 0);
-                }
-                invalidateHwcGeometry();
-                repaintEverything();
-                return NO_ERROR;
-            case 1012:  // Get show frame count parameters
-                reply->writeInt32(mDebugFrameCountFlag);
-                reply->writeInt32(mDebugFrameCountXCoordinate);
-                reply->writeInt32(mDebugFrameCountYCoordinate);
-                return NO_ERROR;
-            case 1016:  // enable/disable frame count increase
-                n = data.readInt32();
-                mDebugFrameCountIncFlag = n;
-                return NO_ERROR;
             case 1013: {
                 Mutex::Autolock _l(mStateLock);
+                sp<const DisplayDevice> hw(getDefaultDisplayDevice());
                 reply->writeInt32(hw->getPageFlipCount());
             }
             return NO_ERROR;
-            case 1014: // setDisplayScaling
-                n = data.readInt32();
-                int32_t result = setDisplayScaling((uint32_t)n);
-                reply->writeInt32(result);
-                return NO_ERROR;
         }
     }
     return err;
@@ -2927,27 +2625,12 @@ status_t SurfaceFlinger::renderScreenToTextureLocked(uint32_t layerStack,
     glLoadIdentity();
     const Vector< sp<LayerBase> >& layers(hw->getVisibleLayersSortedByZ());
     const size_t count = layers.size();
-    if (mAnimFlag) {
-        for (size_t i=0 ; i<count ; ++i) {
-            const sp<LayerBase>& layer(layers[i]);
-            layer->draw(hw);
-        }
+    for (size_t i=0 ; i<count ; ++i) {
+        const sp<LayerBase>& layer(layers[i]);
+        layer->draw(hw);
     }
 
     hw->compositionComplete();
-
-    // Insert egl sync to flush FBO rendering. If it failed, only raise a
-    // warning message but not return false.
-    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    EGLSyncKHR fence = eglCreateSyncKHR(display, EGL_SYNC_FENCE_KHR, NULL);
-    if (fence != EGL_NO_SYNC_KHR) {
-        EGLint result = eglClientWaitSyncKHR(display, fence,
-                EGL_SYNC_FLUSH_COMMANDS_BIT_KHR, 1000000000);
-        if (result == EGL_FALSE)
-            ALOGW("renderScreenToTextureLocked: error waiting for previous "
-                  "fence: %#x", eglGetError());
-        eglDestroySyncKHR(display, fence);
-    }
 
     // back to main framebuffer
     glBindFramebufferOES(GL_FRAMEBUFFER_OES, 0);
@@ -3144,10 +2827,6 @@ status_t SurfaceFlinger::captureScreen(const sp<IBinder>& display,
     return res;
 }
 
-bool SurfaceFlinger::isAnimationPermitted() {
-    return mAnimFlag;
-}
-
 // ---------------------------------------------------------------------------
 
 SurfaceFlinger::LayerVector::LayerVector() {
@@ -3184,7 +2863,7 @@ SurfaceFlinger::DisplayDeviceState::DisplayDeviceState()
 }
 
 SurfaceFlinger::DisplayDeviceState::DisplayDeviceState(DisplayDevice::DisplayType type)
-    : type(type), layerStack(0), orientation(0), scale(0) {
+    : type(type), layerStack(0), orientation(0) {
     viewport.makeInvalid();
     frame.makeInvalid();
 }

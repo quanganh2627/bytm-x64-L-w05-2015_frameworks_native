@@ -36,12 +36,7 @@ namespace android {
 class BufferQueue : public BnSurfaceTexture {
 public:
     enum { MIN_UNDEQUEUED_BUFFERS = 2 };
-    enum { NUM_BUFFER_SLOTS =
-#ifdef GFX_BUF_EXT
-    64 }; // extend GFX buffer from 32 to 64 for VPP support
-#else
-    32 };
-#endif
+    enum { NUM_BUFFER_SLOTS = 32 };
     enum { NO_CONNECTED_API = 0 };
     enum { INVALID_BUFFER_SLOT = -1 };
     enum { STALE_BUFFER_SLOT = 1, NO_BUFFER_AVAILABLE };
@@ -184,9 +179,7 @@ public:
            mScalingMode(NATIVE_WINDOW_SCALING_MODE_FREEZE),
            mTimestamp(0),
            mFrameNumber(0),
-           mBuf(INVALID_BUFFER_SLOT),
-           mTrickMode(false),
-           mVideoSessionID(0) {
+           mBuf(INVALID_BUFFER_SLOT) {
              mCrop.makeInvalid();
          }
         // mGraphicBuffer points to the buffer allocated for this slot or is NULL
@@ -214,12 +207,6 @@ public:
 
         // mFence is a fence that will signal when the buffer is idle.
         sp<Fence> mFence;
-
-        // Indicates whether this buffer is used for trick mode
-        bool mTrickMode;
-
-        // Indicate current video session ID
-        uint32_t mVideoSessionID;
     };
 
     // The following public functions is the consumer facing interface
@@ -261,7 +248,7 @@ public:
     // getReleasedBuffers sets the value pointed to by slotMask to a bit mask
     // indicating which buffer slots the have been released by the BufferQueue
     // but have not yet been released by the consumer.
-    status_t getReleasedBuffers(uint64_t* slotMask);
+    status_t getReleasedBuffers(uint32_t* slotMask);
 
     // setDefaultBufferSize is used to set the size of buffers returned by
     // requestBuffers when a with and height of zero is requested.
@@ -356,9 +343,7 @@ private:
           mFrameNumber(0),
           mEglFence(EGL_NO_SYNC_KHR),
           mAcquireCalled(false),
-          mNeedsCleanupOnRelease(false),
-          mTrickMode(false),
-          mVideoSessionID(0) {
+          mNeedsCleanupOnRelease(false) {
             mCrop.makeInvalid();
         }
 
@@ -422,12 +407,6 @@ private:
 
         // mScalingMode is the current scaling mode for this buffer slot.
         // (example: NATIVE_WINDOW_SCALING_MODE_FREEZE)
-        // refer the definition in system/core/include/system/window.h
-        // FIXME: This variable is reused by MDS(HDMI middleware) to pass video sessionID
-        // Original usage only use low 2 bits, MDS reuse it like this:
-        // Bit 30: trcik mode (HDMI timing seeking)
-        // Bit 29: has video session ID?
-        // Bit 24 ~ 27: video session ID
         uint32_t mScalingMode;
 
         // mTimestamp is the current timestamp for this buffer slot. This gets
@@ -459,12 +438,6 @@ private:
 
         // Indicates whether this buffer needs to be cleaned up by consumer
         bool mNeedsCleanupOnRelease;
-
-        // Indicates whether this buffer is used for trick mode
-        bool mTrickMode;
-
-        // Indicate current video session ID
-        uint32_t mVideoSessionID;
     };
 
     // mSlots is the array of buffer slots that must be mirrored on the client

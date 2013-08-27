@@ -129,9 +129,7 @@ SurfaceTexture::SurfaceTexture(GLuint tex, bool allowSynchronousMode,
     mEglDisplay(EGL_NO_DISPLAY),
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
-    mAttached(true),
-    mTrickMode(false),
-    mVideoSessionID(0)
+    mAttached(true)
 {
     ST_LOGV("SurfaceTexture");
 
@@ -139,11 +137,6 @@ SurfaceTexture::SurfaceTexture(GLuint tex, bool allowSynchronousMode,
             sizeof(mCurrentTransformMatrix));
 
     mBufferQueue->setConsumerUsageBits(DEFAULT_USAGE_FLAGS);
-}
-
-SurfaceTexture::~SurfaceTexture() {
-    ST_LOGV("~SurfaceTexture");
-    abandon();
 }
 
 status_t SurfaceTexture::setDefaultMaxBufferCount(int bufferCount) {
@@ -305,8 +298,6 @@ status_t SurfaceTexture::updateTexImage(BufferRejecter* rejecter, bool skipSync)
         mCurrentScalingMode = item.mScalingMode;
         mCurrentTimestamp = item.mTimestamp;
         mCurrentFence = item.mFence;
-        mTrickMode = item.mTrickMode;
-        mVideoSessionID = item.mVideoSessionID;
         if (!skipSync) {
             // SurfaceFlinger needs to lazily perform GLES synchronization
             // only when it's actually going to use GLES for compositing.
@@ -688,28 +679,13 @@ nsecs_t SurfaceTexture::getTimestamp() {
 
 EGLImageKHR SurfaceTexture::createImage(EGLDisplay dpy,
         const sp<GraphicBuffer>& graphicBuffer) {
-    EGLClientBuffer cbuf;
+    EGLClientBuffer cbuf = (EGLClientBuffer)graphicBuffer->getNativeBuffer();
     EGLint attrs[] = {
         EGL_IMAGE_PRESERVED_KHR,    EGL_TRUE,
         EGL_NONE,
     };
-    EGLImageKHR image;
-
-    if (graphicBuffer == NULL)
-    {
-        ST_LOGV("graphicBuffer is NULL");
-        return EGL_NO_IMAGE_KHR;
-    }
-
-    cbuf = (EGLClientBuffer)graphicBuffer->getNativeBuffer();
-    if (cbuf == NULL)
-    {
-        ST_LOGV("cbuf is NULL");
-        return EGL_NO_IMAGE_KHR;
-    }
-
-    image = eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
-	                          cbuf, attrs);
+    EGLImageKHR image = eglCreateImageKHR(dpy, EGL_NO_CONTEXT,
+            EGL_NATIVE_BUFFER_ANDROID, cbuf, attrs);
     if (image == EGL_NO_IMAGE_KHR) {
         EGLint error = eglGetError();
         ST_LOGE("error creating EGLImage: %#x", error);
@@ -771,16 +747,6 @@ uint32_t SurfaceTexture::getCurrentScalingMode() const {
 sp<Fence> SurfaceTexture::getCurrentFence() const {
     Mutex::Autolock lock(mMutex);
     return mCurrentFence;
-}
-
-bool SurfaceTexture::getTrickMode() const {
-    Mutex::Autolock lock(mMutex);
-    return mTrickMode;
-}
-
-uint32_t SurfaceTexture::getVideoSessionID() const {
-    Mutex::Autolock lock(mMutex);
-    return mVideoSessionID;
 }
 
 status_t SurfaceTexture::doGLFenceWait() const {

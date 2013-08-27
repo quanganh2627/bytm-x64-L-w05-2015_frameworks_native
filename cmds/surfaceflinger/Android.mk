@@ -12,7 +12,6 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/../../services/surfaceflinger
 
-
 LOCAL_MODULE:= surfaceflinger
 
 include $(BUILD_EXECUTABLE)
