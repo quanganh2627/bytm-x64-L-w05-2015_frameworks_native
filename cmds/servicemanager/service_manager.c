@@ -1,6 +1,9 @@
 /* Copyright 2008 The Android Open Source Project
  */
 
+/*
+ * Portions contributed by: Intel Corporation
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -37,6 +40,9 @@ static struct {
     { AID_MEDIA, "media.IntelBufferSharing"},
 #endif
     { AID_DRM,   "drm.drmManager" },
+#ifdef INTEL_WIDI
+    { AID_MEDIA, "media.widi" },
+#endif
     { AID_NFC,   "nfc" },
     { AID_BLUETOOTH, "bluetooth" },
     { AID_RADIO, "radio.phone" },
