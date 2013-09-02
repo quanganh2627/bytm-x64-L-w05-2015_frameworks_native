@@ -75,6 +75,7 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client,
         mNeedsFiltering(false),
         mSecure(false),
         mProtectedByApp(false),
+        mTrickMode(false),
         mHasSurface(false),
         mClientRef(client)
 {
@@ -410,6 +411,11 @@ void Layer::setPerFrameData(const sp<const DisplayDevice>& hw,
     layer.setBuffer(mActiveBuffer);
     layer.setTrickMode(mSurfaceFlingerConsumer->getTrickMode());
     layer.setVideoSessionID(mSurfaceFlingerConsumer->getVideoSessionID());
+
+    if (mSurfaceFlingerConsumer->getTrickMode() != mTrickMode) {
+        mFlinger->invalidateHwcGeometry();
+        mTrickMode = mSurfaceFlingerConsumer->getTrickMode();
+    }
 }
 
 void Layer::setAcquireFence(const sp<const DisplayDevice>& hw,
