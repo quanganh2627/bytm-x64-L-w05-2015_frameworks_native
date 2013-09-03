@@ -46,7 +46,7 @@ static char screenshot_path[PATH_MAX] = "";
 /* dumps the current system state to stdout */
 static void dumpstate() {
     time_t now = time(NULL);
-    struct tm *time_tmp;
+    struct tm *time_tmp = NULL;
     char build[PROPERTY_VALUE_MAX], fingerprint[PROPERTY_VALUE_MAX];
     char radio[PROPERTY_VALUE_MAX], bootloader[PROPERTY_VALUE_MAX];
     char network[PROPERTY_VALUE_MAX], date[80];
@@ -450,7 +450,7 @@ int main(int argc, char *argv[]) {
         if (do_add_date) {
             char date[80];
             time_t now = time(NULL);
-            struct tm *time_tmp;
+            struct tm *time_tmp = NULL;
             time_tmp = localtime((const time_t *)&now);
             strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
             strlcat(path, date, sizeof(path));
