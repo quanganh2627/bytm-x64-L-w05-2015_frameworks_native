@@ -44,6 +44,9 @@ ifeq ($(ENABLE_IMG_GRAPHICS),true)
 		$(TOP)/frameworks/native/include/media/openmax
 	LOCAL_CFLAGS += -DUSE_IMG_GRAPHICS
 endif
+ifeq ($(INTEL_FEATURE_ARKHAM),true)
+LOCAL_CFLAGS += -DINTEL_FEATURE_ARKHAM
+endif
 
 LOCAL_MODULE:= libgui
 
