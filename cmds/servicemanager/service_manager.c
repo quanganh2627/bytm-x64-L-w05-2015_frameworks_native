@@ -33,6 +33,9 @@ static struct {
     { AID_MEDIA, "media.camera" },
     { AID_MEDIA, "media.audio_policy" },
     { AID_MEDIA, "media.gti_service"},
+#ifdef INTEL_VIDEO_XPROC_SHARING
+    { AID_MEDIA, "media.IntelBufferSharing"},
+#endif
     { AID_DRM,   "drm.drmManager" },
     { AID_NFC,   "nfc" },
     { AID_BLUETOOTH, "bluetooth" },
