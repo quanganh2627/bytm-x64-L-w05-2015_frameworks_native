@@ -37,6 +37,9 @@ static struct {
     { AID_MEDIA, "media.audio_policy" },
     { AID_MEDIA, "media.bt_service" },
     { AID_MEDIA, "media.gti_service"},
+#ifdef INTEL_VIDEO_XPROC_SHARING
+    { AID_MEDIA, "media.IntelBufferSharing"},
+#endif
     { AID_DRM,   "drm.drmManager" },
 #ifdef INTEL_WIDI
     { AID_MEDIA, "media.widi" },
