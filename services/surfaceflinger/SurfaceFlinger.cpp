@@ -63,6 +63,7 @@
 #include "GLExtensions.h"
 #include "Layer.h"
 #include "LayerDim.h"
+#include "Ditherer.h"
 #include "SurfaceFlinger.h"
 
 #include "DisplayHardware/FramebufferSurface.h"
@@ -110,6 +111,9 @@ SurfaceFlinger::SurfaceFlinger()
         mMutexLocked(false),
         mSurfaceFlingerThreadId(0),
         mBypassComposition(false)
+#if ENABLE_POSTPROCESS_DITHER
+      , mDitherer(0)
+#endif
 {
     ALOGI("SurfaceFlinger is starting");
 
@@ -147,6 +151,9 @@ void SurfaceFlinger::onFirstRef()
 
 SurfaceFlinger::~SurfaceFlinger()
 {
+#if ENABLE_POSTPROCESS_DITHER
+    delete mDitherer;
+#endif
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglTerminate(display);
@@ -560,6 +567,10 @@ status_t SurfaceFlinger::readyToRun()
     startBootAnim();
 
     mSurfaceFlingerThreadId = getThreadId();
+
+#if ENABLE_POSTPROCESS_DITHER
+    mDitherer = new Ditherer();
+#endif
 
     return NO_ERROR;
 }
@@ -1835,6 +1846,13 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 
     // disable scissor at the end of the frame
     glDisable(GL_SCISSOR_TEST);
+
+#if ENABLE_POSTPROCESS_DITHER
+    if (hasGlesComposition)
+    {
+        mDitherer->apply(0, 0, hw->getWidth(), hw->getHeight());
+    }
+#endif
 }
 
 void SurfaceFlinger::drawWormhole(const sp<const DisplayDevice>& hw,
