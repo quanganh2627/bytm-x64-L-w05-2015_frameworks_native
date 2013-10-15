@@ -403,6 +403,9 @@ private:
     void handleDisplayScaling(const DisplayDeviceState& state,
         Rect& viewport, Rect& frame);
 
+    // Intel feature : queryIfpresnetationMode
+    bool isPresentationMode();
+
     /* ------------------------------------------------------------------------
      * Debugging & dumpsys
      */
