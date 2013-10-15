@@ -2750,13 +2750,22 @@ status_t SurfaceFlinger::onTransact(
              *  intel customization start below
              **************************************/
 
-            enum {eIntelHDMISetting = 2001};
+            enum {
+                eIntelHDMISetting = 2001,
+                eIntelQueryPresentationMode
+            };
             case eIntelHDMISetting: {
                 n = data.readInt32();
                 ALOGD("setting HDMI scaling %d ", n); 
                 int32_t result = setDisplayScaling((uint32_t)n);
                 n = data.readInt32();
                 reply->writeInt32(result);
+                return NO_ERROR;
+            }
+            case eIntelQueryPresentationMode: {
+                bool r = isPresentationMode();
+                ALOGD("is presetation mode %d" , r);
+                reply->writeInt32(r ? 1 : 0);
                 return NO_ERROR;
             }
 
@@ -3284,6 +3293,24 @@ void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
             frame.bottom -= state.scaleStepY * frameHeight / 100;
         }
     }
+}
+
+
+bool SurfaceFlinger::isPresentationMode()
+{
+    Mutex::Autolock _l(mStateLock);
+     //if have more than one displayDevice and whose layerStack > 0
+     //we are in presentation mode
+     for (size_t dpy = 0 ; dpy < mDisplays.size() ; dpy++) {
+        const sp<const DisplayDevice>& hw(mDisplays[dpy]);
+        ALOGI("Device %s -> ls %d ", hw->getDisplayName().string(), hw->getLayerStack());
+        if (hw->getLayerStack() > 0) {
+            return true;
+        }
+     }
+
+     return false;
+
 }
 
 }; // namespace android
