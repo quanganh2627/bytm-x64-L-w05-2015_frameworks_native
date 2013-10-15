@@ -597,6 +597,8 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
             return c;
         } else {
             EGLint error = eglGetError();
+            if (error != EGL_SUCCESS)
+                setError(error, EGL_NO_CONTEXT);
             ALOGE_IF(error == EGL_SUCCESS,
                     "eglCreateContext(%p, %p, %p, %p) returned EGL_NO_CONTEXT "
                     "but no EGL error!",
