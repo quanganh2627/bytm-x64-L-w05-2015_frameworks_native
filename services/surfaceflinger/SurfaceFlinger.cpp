@@ -177,6 +177,10 @@ SurfaceFlinger::SurfaceFlinger()
     }
     ALOGI_IF(mDebugRegion, "showupdates enabled");
     ALOGI_IF(mDebugDDMS, "DDMS debugging enabled");
+
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    mPauseStrategy = new PauseStrategy(this);
+#endif
 }
 
 void SurfaceFlinger::onFirstRef()
@@ -1033,6 +1037,13 @@ void SurfaceFlinger::rebuildLayerStacks() {
                     }
                 }
             }
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+            if (mPauseStrategy->skipBuildLayerList(hw->getDisplayType())) {
+                ALOGD("ORT:skip layer list build for HDMI during rotation animation");
+                continue;
+            }
+#endif
+
             hw->setVisibleLayersSortedByZ(layersSortedByZ);
             hw->undefinedRegion.set(bounds);
             hw->undefinedRegion.subtractSelf(tr.transform(opaqueRegion));
@@ -1064,7 +1075,11 @@ void SurfaceFlinger::setUpHWComposer() {
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
-                            if (mDebugDisableHWC || mDebugRegion || mDaltonize) {
+                            bool forceSkip = false;
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+                            forceSkip = mPauseStrategy->forceHwcSkip(hw->getDisplayType());
+#endif
+                            if (forceSkip || mDebugDisableHWC || mDebugRegion || mDaltonize) {
                                 cur->setSkip(true);
                             }
                         }
@@ -1106,9 +1121,20 @@ void SurfaceFlinger::setUpHWComposer() {
 
 void SurfaceFlinger::doComposition() {
     ATRACE_CALL();
+    bool skipCompostionExternalDisplay = false;
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    skipCompostionExternalDisplay = mPauseStrategy->skipComposition();
+#endif
     const bool repaintEverything = android_atomic_and(0, &mRepaintEverything);
     for (size_t dpy=0 ; dpy<mDisplays.size() ; dpy++) {
         const sp<DisplayDevice>& hw(mDisplays[dpy]);
+
+        if (CC_UNLIKELY(skipCompostionExternalDisplay)){
+            if(hw->getDisplayType() >= DisplayDevice::DISPLAY_EXTERNAL) {
+                ALOGD("ORT: by pass composition on external display");
+                continue;
+            }
+        }
         if (hw->canDraw()) {
             // transform the dirty region into this screen's coordinate space
             const Region dirtyRegion(hw->getDirtyRegion(repaintEverything));
@@ -1212,6 +1238,10 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
     const LayerVector& currentLayers(mCurrentState.layersSortedByZ);
     const size_t count = currentLayers.size();
 
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    mPauseStrategy->handleExternalDisplayPauseLocked();
+#endif
+
     /*
      * Traversal of the children
      * (perform the transaction for each of them if needed)
@@ -1296,6 +1326,15 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                                 || (state.frame != draw[i].frame)
                                 || (state.scale != draw[i].scale))
                         {
+
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+                            // skip the project setting for HDMI and redo it until the rotation animation done
+                            if (mPauseStrategy->skipProjectionSetting(disp->getDisplayType())) {
+                                ALOGD("ORT: delay projection setting");
+                                continue;
+                            }
+#endif
+
                             Rect frame = state.frame;
                             Rect viewport = state.viewport;
                             // this will modify viewport and frame parameters
@@ -1906,6 +1945,12 @@ void SurfaceFlinger::setTransactionState(
         }
     }
 
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    // This approach rely on the chagne in WMS to notfiy the animation status
+     bool shouldDisableAnimationRotaion = flags & eRotationAnimationInProcess ? true: false;
+     mPauseStrategy->disableAnimationRotation(shouldDisableAnimationRotaion);
+#endif
+
     size_t count = displays.size();
     for (size_t i=0 ; i<count ; i++) {
         const DisplayState& s(displays[i]);
@@ -2234,6 +2279,9 @@ void SurfaceFlinger::onScreenAcquired(const sp<const DisplayDevice>& hw) {
         }
     }
     mVisibleRegionsDirty = true;
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    mPauseStrategy->resetBypassFlag();
+#endif
     repaintEverything();
 }
 
@@ -2759,7 +2807,8 @@ status_t SurfaceFlinger::onTransact(
 
             enum {
                 eIntelHDMISetting = 2001,
-                eIntelQueryPresentationMode
+                eIntelQueryPresentationMode,
+                eIntelPauseExternalDisplay
             };
             case eIntelHDMISetting: {
                 n = data.readInt32();
@@ -2776,6 +2825,14 @@ status_t SurfaceFlinger::onTransact(
                 return NO_ERROR;
             }
 
+            case eIntelPauseExternalDisplay: {//pause external display
+                n = data.readInt32();
+                bool status = (n == 0 ? true : false);
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+                mPauseStrategy->setPauseExternalDisplay(status);
+#endif
+                return NO_ERROR;
+            }
         }
     }
     return err;
@@ -3326,6 +3383,39 @@ bool SurfaceFlinger::isPresentationMode()
      return false;
 
 }
+
+bool SurfaceFlinger::queryRotationIsFinished() {
+    Mutex::Autolock _l(mStateLock);
+    bool result = true;
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    result = mPauseStrategy->isRotationFinished();
+#endif
+    return result;
+
+}
+
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+// must be called in SF main thread
+void SurfaceFlinger::rectifyProjectionSetting()
+{
+    ALOGD("ORT: rectify projection");
+    //redo the last skipped device projection setting
+    const KeyedVector<wp<IBinder>, DisplayDeviceState>& draw(mDrawingState.displays);
+    size_t dc = draw.size();
+    for (unsigned int i = 0; i < dc; ++i) {
+        const DisplayDeviceState& state(draw[i]);
+        const wp<IBinder>& display(draw.keyAt(i));
+        const sp<DisplayDevice> disp(getDisplayDevice(display));
+        if ((disp != NULL)
+            && (disp->getDisplayType() != DisplayDevice::DISPLAY_PRIMARY)) {
+            Rect frame = state.frame;
+            Rect viewport = state.viewport;
+            handleDisplayScaling(state, viewport, frame);
+            disp->setProjection(state.orientation, viewport, frame);
+        }
+    }
+}
+#endif
 
 }; // namespace android
 

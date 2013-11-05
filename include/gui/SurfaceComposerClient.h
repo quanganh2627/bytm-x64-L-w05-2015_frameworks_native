@@ -113,6 +113,10 @@ public:
     //! Flag the currently open transaction as an animation transaction.
     static void setAnimationTransaction();
 
+    //! set the rotation animation status.
+    static void setRotationAnimationStatus(bool on);
+
+
     status_t    hide(const sp<IBinder>& id);
     status_t    show(const sp<IBinder>& id);
     status_t    setFlags(const sp<IBinder>& id, uint32_t flags, uint32_t mask);

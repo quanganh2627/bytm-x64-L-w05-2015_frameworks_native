@@ -51,7 +51,7 @@
 #include "DispSync.h"
 #include "FrameTracker.h"
 #include "MessageQueue.h"
-
+#include "PauseStrategy.h"
 #include "DisplayHardware/HWComposer.h"
 #include "Effects/Daltonizer.h"
 
@@ -132,6 +132,9 @@ public:
     RenderEngine& getRenderEngine() const {
         return *mRenderEngine;
     }
+    // to query if the rotation is finished, the rotation info
+    // is updated by WindowManager
+    bool queryRotationIsFinished();
 
 private:
     friend class Client;
@@ -502,6 +505,21 @@ private:
 
     /* Intel HDMI setting feature*/
     uint32_t mDisplayScaleState;
+
+    /* -------------------------------------------
+     * Intel extension
+     */
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+    // don't use sp intentionally to save a few instructions
+    // since SurfaceFlinger is singleton, is safe to leave it undeleted
+    PauseStrategy* mPauseStrategy;
+public:
+    void rectifyProjectionSetting();
+    void invalidateVisibleRegion() { mVisibleRegionsDirty = true;};
+    void setPausetTransaction() {setTransactionFlags(eDisplayTransactionNeeded);};
+
+#endif
+
 };
 
 }; // namespace android
