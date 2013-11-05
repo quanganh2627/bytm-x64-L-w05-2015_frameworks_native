@@ -51,6 +51,7 @@ public:
     enum {
         eSynchronous = 0x01,
         eAnimation   = 0x02,
+        eRotationAnimationInProcess = 0x04,
     };
 
     enum {
