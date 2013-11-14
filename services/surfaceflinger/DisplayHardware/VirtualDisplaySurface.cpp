@@ -66,8 +66,6 @@ VirtualDisplaySurface::VirtualDisplaySurface(HWComposer& hwc, int32_t dispId,
     mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_COMPOSER);
     mConsumer->setDefaultBufferSize(sinkWidth, sinkHeight);
     mConsumer->setDefaultMaxBufferCount(2);
-    // for Intel WIDI dispId is hard coded to 2, so this check is not needed.
-    //LOG_ALWAYS_FATAL_IF(dispId >= 0);
 }
 
 VirtualDisplaySurface::~VirtualDisplaySurface() {

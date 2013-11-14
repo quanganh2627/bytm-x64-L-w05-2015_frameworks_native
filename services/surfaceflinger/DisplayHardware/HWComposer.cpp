@@ -125,7 +125,7 @@ HWComposer::HWComposer(
     }
 
     // these display IDs are always reserved
-    for (size_t i=0 ; i<MAX_HWC_DISPLAYS ; i++) {
+    for (size_t i=0 ; i<NUM_BUILTIN_DISPLAYS ; i++) {
         mAllocatedDisplayIDs.markBit(i);
     }
 
@@ -152,8 +152,8 @@ HWComposer::HWComposer(
 
         // the number of displays we actually have depends on the
         // hw composer version
-        if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_2)) {
-            // 1.?? adds support for virtual displays
+        if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_3)) {
+            // 1.3 adds support for virtual displays
             mNumDisplays = MAX_HWC_DISPLAYS;
         } else if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
             // 1.1 adds support for multiple displays
