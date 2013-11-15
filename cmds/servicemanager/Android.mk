@@ -9,4 +9,11 @@ include $(CLEAR_VARS)
 LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_SRC_FILES := service_manager.c binder.c
 LOCAL_MODULE := servicemanager
+
+ifeq ($(TARGET_BUILD_VARIANT), $(filter $(TARGET_BUILD_VARIANT), eng userdebug))
+ifeq ($(INTEL_WIDI), true)
+    LOCAL_CFLAGS += -DINTEL_WIDI=1
+endif
+endif
+
 include $(BUILD_EXECUTABLE)
