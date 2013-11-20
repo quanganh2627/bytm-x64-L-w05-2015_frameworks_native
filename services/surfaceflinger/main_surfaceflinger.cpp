@@ -25,13 +25,6 @@
 #include <binder/IServiceManager.h>
 #include "SurfaceFlinger.h"
 
-#ifdef TARGET_HAS_MULTIPLE_DISPLAY
-#include <display/MultiDisplayService.h>
-#ifndef USE_MDS_LEGACY
-using namespace android::intel;
-#endif
-#endif
-
 using namespace android;
 
 int main(int argc, char** argv) {
@@ -42,11 +35,6 @@ int main(int argc, char** argv) {
     // start the thread pool
     sp<ProcessState> ps(ProcessState::self());
     ps->startThreadPool();
-
-#ifdef TARGET_HAS_MULTIPLE_DISPLAY
-    // instantiate multidisplay service
-    MultiDisplayService::instantiate();
-#endif
 
     // instantiate surfaceflinger
     sp<SurfaceFlinger> flinger = new SurfaceFlinger();
