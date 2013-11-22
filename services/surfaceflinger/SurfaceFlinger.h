@@ -62,9 +62,6 @@ class IGraphicBufferAlloc;
 class Layer;
 class LayerDim;
 class Surface;
-#if ENABLE_POSTPROCESS_DITHER
-class Ditherer;
-#endif
 
 // ---------------------------------------------------------------------------
 
@@ -73,13 +70,6 @@ enum {
     eTraversalNeeded          = 0x02,
     eDisplayTransactionNeeded = 0x04,
     eTransactionMask          = 0x07
-};
-
-enum {
-    eDisplayScaleNone            = 0,
-    eDisplayScaleFullscreen      = 1,
-    eDisplayScaleCenter          = 2,
-    eDisplayScaleAspect          = 3
 };
 
 class SurfaceFlinger : public BinderService<SurfaceFlinger>,
@@ -131,9 +121,6 @@ public:
     // TODO: this should be made accessible only to HWComposer
     const Vector< sp<Layer> >& getLayerSortedByZForHwcDisplay(int id);
 
-    // to query if the rotation is finished, the rotation info
-    // is updated by WindowManager
-    bool queryRotationIsFinished();
 private:
     friend class Client;
     friend class DisplayEventConnection;
@@ -168,14 +155,6 @@ private:
         uint8_t orientation;
         String8 displayName;
         bool isSecure;
-        union {
-            uint32_t scale;
-            struct {
-                uint16_t scaleMode;
-                uint8_t  scaleStepX;
-                uint8_t  scaleStepY;
-            };
-        };
     };
 
     struct State {
@@ -212,7 +191,6 @@ private:
     // called when screen is turning back on
     virtual void unblank(const sp<IBinder>& display);
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
-    virtual bool isAnimationPermitted();
 
     /* ------------------------------------------------------------------------
      * DeathRecipient interface
@@ -258,14 +236,6 @@ private:
      * if available and compute the dirty region.
      */
     void handlePageFlip();
-
-    // setDisplayScaling: binder transcation for display scaling
-    int setDisplayScaling(uint32_t scale);
-    bool isPresentationMode();
-
-    // handleDisplayScaling: calculate the scaled frame rect.
-    void handleDisplayScaling(const DisplayDeviceState& state,
-        Rect& viewport, Rect& frame);
 
     /* ------------------------------------------------------------------------
      * Transactions
@@ -423,9 +393,6 @@ private:
     void dumpAllLocked(String8& result, char* buffer, size_t SIZE) const;
     bool startDdmConnection();
     static void appendSfConfigString(String8& result);
-    bool alreadyLockedBySurfaceFlingerThread(){
-            return (getThreadId() == mSurfaceFlingerThreadId) && mMutexLocked;
-    };
 
     /* ------------------------------------------------------------------------
      * Attributes
@@ -438,12 +405,8 @@ private:
     Condition mTransactionCV;
     bool mTransactionPending;
     bool mAnimTransactionPending;
-    bool mTransitionOn;
-    bool mOrientationEnd;
     Vector< sp<Layer> > mLayersPendingRemoval;
     SortedVector< wp<IBinder> > mGraphicBufferProducerList;
-    // Last DisplayScaling status
-    uint32_t mDisplayScaleState;
 
     // protected by mStateLock (but we could use another lock)
     bool mLayersRemoved;
@@ -486,7 +449,6 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
-    bool mAnimFlag;
 
     // these are thread safe
     mutable MessageQueue mEventQueue;
@@ -497,19 +459,11 @@ private:
     mutable Mutex mDestroyedLayerLock;
     Vector<Layer const *> mDestroyedLayers;
 
-   //for work around the dead lock
-   bool                        mMutexLocked;
-   thread_id_t                 mSurfaceFlingerThreadId;
     /* ------------------------------------------------------------------------
      * Feature prototyping
      */
 
     sp<IBinder> mExtDisplayToken;
-    bool mBypassComposition;
-
-#if ENABLE_POSTPROCESS_DITHER
-    Ditherer* mDitherer;
-#endif
 };
 
 // ---------------------------------------------------------------------------

@@ -27,8 +27,7 @@ VirtualDisplaySurface::VirtualDisplaySurface(HWComposer& hwc, int32_t dispId,
         const sp<IGraphicBufferProducer>& sink, const String8& name)
 :   mSink(sink)
 {
-    // for Intel WIDI dispId is hard coded to 2, so this check is not needed.
-    //LOG_ALWAYS_FATAL_IF(dispId >= 0);
+    LOG_ALWAYS_FATAL_IF(dispId >= 0);
 }
 
 VirtualDisplaySurface::~VirtualDisplaySurface() {

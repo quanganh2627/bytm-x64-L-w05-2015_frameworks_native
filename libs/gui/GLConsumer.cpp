@@ -94,9 +94,7 @@ GLConsumer::GLConsumer(GLuint tex, bool allowSynchronousMode,
     mEglDisplay(EGL_NO_DISPLAY),
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
-    mAttached(true),
-    mTrickMode(false),
-    mVideoSessionID(0)
+    mAttached(true)
 {
     ST_LOGV("GLConsumer");
 
@@ -104,11 +102,6 @@ GLConsumer::GLConsumer(GLuint tex, bool allowSynchronousMode,
             sizeof(mCurrentTransformMatrix));
 
     mBufferQueue->setConsumerUsageBits(DEFAULT_USAGE_FLAGS);
-}
-
-GLConsumer::~GLConsumer() {
-    ST_LOGV("~GLConsumer");
-    abandon();
 }
 
 status_t GLConsumer::setDefaultMaxBufferCount(int bufferCount) {
@@ -273,8 +266,6 @@ status_t GLConsumer::releaseAndUpdateLocked(const BufferQueue::BufferItem& item)
     mCurrentScalingMode = item.mScalingMode;
     mCurrentTimestamp = item.mTimestamp;
     mCurrentFence = item.mFence;
-    mTrickMode = item.mTrickMode;
-    mVideoSessionID = item.mVideoSessionID;
 
     computeCurrentTransformMatrixLocked();
 
@@ -780,16 +771,6 @@ sp<Fence> GLConsumer::getCurrentFence() const {
 status_t GLConsumer::doGLFenceWait() const {
     Mutex::Autolock lock(mMutex);
     return doGLFenceWaitLocked();
-}
-
-bool GLConsumer::getTrickMode() const {
-    Mutex::Autolock lock(mMutex);
-    return mTrickMode;
-}
-
-uint32_t GLConsumer::getVideoSessionID() const {
-    Mutex::Autolock lock(mMutex);
-    return mVideoSessionID;
 }
 
 status_t GLConsumer::doGLFenceWaitLocked() const {

@@ -1470,8 +1470,7 @@ status_t Parcel::continueWrite(size_t desired)
         size_t* objects = NULL;
         
         if (objectsSize) {
-            //valgrind warning fix: it is necessary to initialize the allocated memory
-            objects = (size_t*)calloc(objectsSize, sizeof(size_t));
+            objects = (size_t*)malloc(objectsSize*sizeof(size_t));
             if (!objects) {
                 mError = NO_MEMORY;
                 return NO_MEMORY;
@@ -1548,8 +1547,7 @@ status_t Parcel::continueWrite(size_t desired)
         
     } else {
         // This is the first data.  Easy!
-        //valgrind warning fix: it is necessary to initialize the allocated memory
-        uint8_t* data = (uint8_t*)calloc(desired, sizeof(uint8_t));
+        uint8_t* data = (uint8_t*)malloc(desired);
         if (!data) {
             mError = NO_MEMORY;
             return NO_MEMORY;

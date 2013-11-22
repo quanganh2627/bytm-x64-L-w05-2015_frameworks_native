@@ -89,8 +89,6 @@ public:
             GLenum texTarget = GL_TEXTURE_EXTERNAL_OES, bool useFenceSync = true,
             const sp<BufferQueue> &bufferQueue = 0);
 
-    virtual ~GLConsumer();
-
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
     //
@@ -186,12 +184,6 @@ public:
     // set the name of the GLConsumer that will be used to identify it in
     // log messages.
     void setName(const String8& name);
-
-    // getTrickMode returns whether video is in trick playback
-    bool getTrickMode() const;
-
-    // getVideoSessionID returns video session ID
-    uint32_t getVideoSessionID() const;
 
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
@@ -427,13 +419,6 @@ private:
     // It is set to false by detachFromContext, and then set to true again by
     // attachToContext.
     bool mAttached;
-
-    // mTrickMode indicates whether the current surface is used for trick
-    // playback.
-    bool mTrickMode;
-
-    // mVideoSessionID indicates video session ID
-    uint32_t mVideoSessionID;
 };
 
 // ----------------------------------------------------------------------------

@@ -129,7 +129,7 @@ HWComposer::HWComposer(
     }
 
     // these display IDs are always reserved
-    for (size_t i=0 ; i<MAX_DISPLAYS ; i++) {
+    for (size_t i=0 ; i<NUM_PHYSICAL_DISPLAYS ; i++) {
         mAllocatedDisplayIDs.markBit(i);
     }
 
@@ -156,7 +156,7 @@ HWComposer::HWComposer(
 
         // the number of displays we actually have depends on the
         // hw composer version
-        if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_2)) {
+        if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_EXP)) {
             // 1.?? adds support for virtual displays
             mNumDisplays = MAX_DISPLAYS;
         } else if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
@@ -368,7 +368,7 @@ status_t HWComposer::queryDisplayProperties(int disp) {
     }
 
     // FIXME: what should we set the format to?
-    mDisplayData[disp].format = HAL_PIXEL_FORMAT_BGRA_8888;
+    mDisplayData[disp].format = HAL_PIXEL_FORMAT_RGBA_8888;
     mDisplayData[disp].connected = true;
     if (mDisplayData[disp].xdpi == 0.0f || mDisplayData[disp].ydpi == 0.0f) {
         float dpi = getDefaultDensity(h);
@@ -535,8 +535,6 @@ status_t HWComposer::createWorkList(int32_t id, size_t numLayers) {
         disp.list->retireFenceFd = -1;
         disp.list->flags = HWC_GEOMETRY_CHANGED;
         disp.list->numHwLayers = numLayers;
-        if (!mFlinger->queryRotationIsFinished())
-            disp.list->flags |= HWC_ROTATION_IN_PROGRESS;
     }
     return NO_ERROR;
 }
@@ -736,7 +734,7 @@ int HWComposer::getVisualID() const {
         // FIXME: temporary hack until HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
         // is supported by the implementation. we can only be in this case
         // if we have HWC 1.1
-        return HAL_PIXEL_FORMAT_BGRA_8888;
+        return HAL_PIXEL_FORMAT_RGBA_8888;
         //return HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     } else {
         return mFbDev->format;
@@ -877,16 +875,6 @@ public:
         } else {
             getLayer()->flags &= ~HWC_SKIP_LAYER;
         }
-    }
-    virtual void setTrickMode(bool on) {
-        if (on) {
-            getLayer()->flags |= HWC_TRICK_MODE;
-        } else {
-            getLayer()->flags &= ~HWC_TRICK_MODE;
-        }
-    }
-    virtual void setVideoSessionID(uint32_t sessionID) {
-        getLayer()->flags |= sessionID;
     }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;
