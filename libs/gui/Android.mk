@@ -2,13 +2,14 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
+	IGraphicBufferConsumer.cpp \
+	IConsumerListener.cpp \
 	BitTube.cpp \
 	BufferItemConsumer.cpp \
 	BufferQueue.cpp \
 	ConsumerBase.cpp \
 	CpuConsumer.cpp \
 	DisplayEventReceiver.cpp \
-	DummyConsumer.cpp \
 	GLConsumer.cpp \
 	GraphicBufferAlloc.cpp \
 	GuiConfig.cpp \
@@ -46,6 +47,16 @@ ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 endif
 ifeq ($(TARGET_BOARD_PLATFORM), tegra3)
 	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
+	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
+endif
+
+# for VPP support on MRFLD only
+ifeq ($(TARGET_HAS_VPP),true)
+    LOCAL_CFLAGS += -DGFX_BUF_EXT
 endif
 
 include $(BUILD_SHARED_LIBRARY)

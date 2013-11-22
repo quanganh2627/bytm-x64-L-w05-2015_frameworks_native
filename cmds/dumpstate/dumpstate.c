@@ -33,7 +33,7 @@
 #include "private/android_filesystem_config.h"
 
 #define LOG_TAG "dumpstate"
-#include <utils/Log.h>
+#include <cutils/log.h>
 
 #include "dumpstate.h"
 
@@ -46,6 +46,7 @@ static char screenshot_path[PATH_MAX] = "";
 /* dumps the current system state to stdout */
 static void dumpstate() {
     time_t now = time(NULL);
+    struct tm *time_tmp = NULL;
     char build[PROPERTY_VALUE_MAX], fingerprint[PROPERTY_VALUE_MAX];
     char radio[PROPERTY_VALUE_MAX], bootloader[PROPERTY_VALUE_MAX];
     char network[PROPERTY_VALUE_MAX], date[80];
@@ -57,7 +58,8 @@ static void dumpstate() {
     property_get("ro.baseband", radio, "(unknown)");
     property_get("ro.bootloader", bootloader, "(unknown)");
     property_get("gsm.operator.alpha", network, "(unknown)");
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    time_tmp = localtime((const time_t *)&now);
+    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", time_tmp);
 
     printf("========================================================\n");
     printf("== dumpstate: %s\n", date);
@@ -95,6 +97,7 @@ static void dumpstate() {
 
     run_command("PROCESSES", 10, "ps", "-P", NULL);
     run_command("PROCESSES AND THREADS", 10, "ps", "-t", "-p", "-P", NULL);
+    run_command("PROCESSES (SELINUX LABELS)", 10, "ps", "-Z", NULL);
     run_command("LIBRANK", 10, "librank", NULL);
 
     do_dmesg();
@@ -186,7 +189,7 @@ static void dumpstate() {
     run_command("IP6TABLE RAW", 10, SU_PATH, "root", "ip6tables", "-t", "raw", "-L", "-nvx", NULL);
 
     run_command("WIFI NETWORKS", 20,
-            SU_PATH, "root", "wpa_cli", "list_networks", NULL);
+            SU_PATH, "root", "wpa_cli", "IFNAME=wlan0", "list_networks", NULL);
 
 #ifdef FWDUMP_bcmdhd
     run_command("DUMP WIFI INTERNAL COUNTERS", 20,
@@ -243,14 +246,12 @@ static void dumpstate() {
     dump_file("BINDER STATS", "/sys/kernel/debug/binder/stats");
     dump_file("BINDER STATE", "/sys/kernel/debug/binder/state");
 
-#ifdef BOARD_HAS_DUMPSTATE
     printf("========================================================\n");
     printf("== Board\n");
     printf("========================================================\n");
 
     dumpstate_board();
     printf("\n");
-#endif
 
     /* Migrate the ril_dumpstate to a dumpstate_board()? */
     char ril_dumpstate_timeout[PROPERTY_VALUE_MAX] = {0};
@@ -276,6 +277,16 @@ static void dumpstate() {
        to increase its timeout.  we really need to do the timeouts in
        dumpsys itself... */
     run_command("DUMPSYS", 60, "dumpsys", NULL);
+
+    printf("========================================================\n");
+    printf("== Checkins\n");
+    printf("========================================================\n");
+
+    run_command("CHECKIN BATTERYSTATS", 30, "dumpsys", "batterystats", "-c", NULL);
+    run_command("CHECKIN MEMINFO", 30, "dumpsys", "meminfo", "--checkin", NULL);
+    run_command("CHECKIN NETSTATS", 30, "dumpsys", "netstats", "--checkin", NULL);
+    run_command("CHECKIN PROCSTATS", 30, "dumpsys", "procstats", "-c", NULL);
+    run_command("CHECKIN USAGESTATS", 30, "dumpsys", "usagestats", "-c", NULL);
 
     printf("========================================================\n");
     printf("== Running Application Activities\n");
@@ -315,7 +326,13 @@ static void usage() {
 		);
 }
 
+static void sigpipe_handler(int n) {
+    (void)n;
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char *argv[]) {
+    struct sigaction sigact;
     int do_add_date = 0;
     int do_compress = 0;
     int do_vibrate = 1;
@@ -336,7 +353,9 @@ int main(int argc, char *argv[]) {
     }
     ALOGI("begin\n");
 
-    signal(SIGPIPE, SIG_IGN);
+    memset(&sigact, 0, sizeof(sigact));
+    sigact.sa_handler = sigpipe_handler;
+    sigaction(SIGPIPE, &sigact, NULL);
 
     /* set as high priority, and protect from OOM killer */
     setpriority(PRIO_PROCESS, 0, -20);
@@ -431,7 +450,9 @@ int main(int argc, char *argv[]) {
         if (do_add_date) {
             char date[80];
             time_t now = time(NULL);
-            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", localtime(&now));
+            struct tm *time_tmp = NULL;
+            time_tmp = localtime((const time_t *)&now);
+            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
             strlcat(path, date, sizeof(path));
         }
         if (do_fb) {

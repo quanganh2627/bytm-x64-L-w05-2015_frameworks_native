@@ -38,6 +38,8 @@
 #include <cutils/sockets.h>
 #include <private/android_filesystem_config.h>
 
+#include <selinux/android.h>
+
 #include "dumpstate.h"
 
 /* list of native processes to include in the native dumps */
@@ -226,7 +228,9 @@ int dump_file(const char *title, const char* path) {
         if (memcmp(path, "/proc/", 6) && memcmp(path, "/sys/", 5) && !fstat(fd, &st)) {
             char stamp[80];
             time_t mtime = st.st_mtime;
-            strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", localtime(&mtime));
+            struct tm *time_tmp = NULL;
+            time_tmp = localtime((const time_t *)&mtime);
+            strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", time_tmp);
             printf(": %s", stamp);
         }
         printf(") ------\n");
@@ -467,6 +471,9 @@ const char *dump_traces() {
         if (!mkdir(anr_traces_dir, 0775)) {
             chown(anr_traces_dir, AID_SYSTEM, AID_SYSTEM);
             chmod(anr_traces_dir, 0775);
+            if (selinux_android_restorecon(anr_traces_dir) == -1) {
+                fprintf(stderr, "restorecon failed for %s: %s\n", anr_traces_dir, strerror(errno));
+            }
         } else if (errno != EEXIST) {
             fprintf(stderr, "mkdir(%s): %s\n", anr_traces_dir, strerror(errno));
             return NULL;

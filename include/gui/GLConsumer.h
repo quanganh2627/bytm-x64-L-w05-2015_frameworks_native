@@ -19,8 +19,6 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
 
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/BufferQueue.h>
@@ -31,10 +29,6 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
-
-#define ANDROID_GRAPHICS_SURFACETEXTURE_JNI_ID "mSurfaceTexture"
-#define ANDROID_GRAPHICS_FRAMEAVAILABLELISTENER_JNI_ID \
-                                         "mFrameAvailableListener"
 
 namespace android {
 // ----------------------------------------------------------------------------
@@ -58,6 +52,8 @@ class String8;
  * This class was previously called SurfaceTexture.
  */
 class GLConsumer : public ConsumerBase {
+protected:
+    enum { TEXTURE_EXTERNAL = 0x8D65 }; // GL_TEXTURE_EXTERNAL_OES
 public:
     typedef ConsumerBase::FrameAvailableListener FrameAvailableListener;
 
@@ -85,9 +81,11 @@ public:
     // purely to allow a GLConsumer to be transferred from one consumer
     // context to another. If such a transfer is not needed there is no
     // requirement that either of these methods be called.
-    GLConsumer(GLuint tex, bool allowSynchronousMode = true,
-            GLenum texTarget = GL_TEXTURE_EXTERNAL_OES, bool useFenceSync = true,
-            const sp<BufferQueue> &bufferQueue = 0);
+    GLConsumer(const sp<IGraphicBufferConsumer>& bq,
+            uint32_t tex, uint32_t texureTarget = TEXTURE_EXTERNAL,
+            bool useFenceSync = true, bool isControlledByApp = false);
+
+    virtual ~GLConsumer();
 
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
@@ -97,6 +95,13 @@ public:
     //
     // This calls doGLFenceWait to ensure proper synchronization.
     status_t updateTexImage();
+
+    // releaseTexImage releases the texture acquired in updateTexImage().
+    // This is intended to be used in single buffer mode.
+    //
+    // This call may only be made while the OpenGL ES context to which the
+    // target texture belongs is bound to the calling thread.
+    status_t releaseTexImage();
 
     // setReleaseFence stores a fence that will signal when the current buffer
     // is no longer being read. This fence will be returned to the producer
@@ -138,6 +143,13 @@ public:
     // documented by the source.
     int64_t getTimestamp();
 
+    // getFrameNumber retrieves the frame number associated with the texture
+    // image set by the most recent call to updateTexImage.
+    //
+    // The frame number is an incrementing counter set to 0 at the creation of
+    // the BufferQueue associated with this consumer.
+    int64_t getFrameNumber();
+
     // setDefaultBufferSize is used to set the size of buffers returned by
     // requestBuffers when a with and height of zero is requested.
     // A call to setDefaultBufferSize() may trigger requestBuffers() to
@@ -157,7 +169,7 @@ public:
 
     // getCurrentTextureTarget returns the texture target of the current
     // texture as returned by updateTexImage().
-    GLenum getCurrentTextureTarget() const;
+    uint32_t getCurrentTextureTarget() const;
 
     // getCurrentCrop returns the cropping rectangle of the current buffer.
     Rect getCurrentCrop() const;
@@ -177,26 +189,18 @@ public:
     // current texture buffer.
     status_t doGLFenceWait() const;
 
-    // isSynchronousMode returns whether the GLConsumer is currently in
-    // synchronous mode.
-    bool isSynchronousMode() const;
-
     // set the name of the GLConsumer that will be used to identify it in
     // log messages.
     void setName(const String8& name);
+
+    // getVideoSessionID returns video session ID
+    uint32_t getVideoSessionID() const;
 
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
     status_t setDefaultBufferFormat(uint32_t defaultFormat);
     status_t setConsumerUsageBits(uint32_t usage);
     status_t setTransformHint(uint32_t hint);
-    virtual status_t setSynchronousMode(bool enabled);
-
-    // getBufferQueue returns the BufferQueue object to which this
-    // GLConsumer is connected.
-    sp<BufferQueue> getBufferQueue() const {
-        return mBufferQueue;
-    }
 
     // detachFromContext detaches the GLConsumer from the calling thread's
     // current OpenGL ES context.  This context must be the same as the context
@@ -223,7 +227,7 @@ public:
     // call to attachToContext will result in this texture object being bound to
     // the texture target and populated with the image contents that were
     // current at the time of the last call to detachFromContext.
-    status_t attachToContext(GLuint tex);
+    status_t attachToContext(uint32_t tex);
 
 protected:
 
@@ -233,20 +237,22 @@ protected:
 
     // dumpLocked overrides the ConsumerBase method to dump GLConsumer-
     // specific info in addition to the ConsumerBase behavior.
-    virtual void dumpLocked(String8& result, const char* prefix, char* buffer,
-           size_t size) const;
+    virtual void dumpLocked(String8& result, const char* prefix) const;
 
     // acquireBufferLocked overrides the ConsumerBase method to update the
     // mEglSlots array in addition to the ConsumerBase behavior.
-    virtual status_t acquireBufferLocked(BufferQueue::BufferItem *item);
+    virtual status_t acquireBufferLocked(BufferQueue::BufferItem *item,
+        nsecs_t presentWhen);
 
     // releaseBufferLocked overrides the ConsumerBase method to update the
     // mEglSlots array in addition to the ConsumerBase.
-    virtual status_t releaseBufferLocked(int buf, EGLDisplay display,
-           EGLSyncKHR eglFence);
+    virtual status_t releaseBufferLocked(int slot,
+            const sp<GraphicBuffer> graphicBuffer,
+            EGLDisplay display, EGLSyncKHR eglFence);
 
-    status_t releaseBufferLocked(int buf, EGLSyncKHR eglFence) {
-        return releaseBufferLocked(buf, mEglDisplay, eglFence);
+    status_t releaseBufferLocked(int slot,
+            const sp<GraphicBuffer> graphicBuffer, EGLSyncKHR eglFence) {
+        return releaseBufferLocked(slot, graphicBuffer, mEglDisplay, eglFence);
     }
 
     static bool isExternalFormat(uint32_t format);
@@ -254,7 +260,7 @@ protected:
     // This releases the buffer in the slot referenced by mCurrentTexture,
     // then updates state to refer to the BufferItem, which must be a
     // newly-acquired buffer.
-    status_t releaseAndUpdateLocked(const BufferQueue::BufferItem& item);
+    status_t updateAndReleaseLocked(const BufferQueue::BufferItem& item);
 
     // Binds mTexName and the current buffer to mTexTarget.  Uses
     // mCurrentTexture if it's set, mCurrentTextureBuf if not.  If the
@@ -265,12 +271,14 @@ protected:
     // to mEglDisplay and mEglContext.  If the fields have been previously
     // set, the values must match; if not, the fields are set to the current
     // values.
-    status_t checkAndUpdateEglStateLocked();
+    // The contextCheck argument is used to ensure that a GL context is
+    // properly set; when set to false, the check is not performed.
+    status_t checkAndUpdateEglStateLocked(bool contextCheck = false);
 
 private:
     // createImage creates a new EGLImage from a GraphicBuffer.
     EGLImageKHR createImage(EGLDisplay dpy,
-            const sp<GraphicBuffer>& graphicBuffer);
+            const sp<GraphicBuffer>& graphicBuffer, const Rect& crop);
 
     // freeBufferLocked frees up the given buffer slot.  If the slot has been
     // initialized this will release the reference to the GraphicBuffer in that
@@ -302,6 +310,9 @@ private:
     // it in our slot array.  bindUnslottedBuffer handles that situation by
     // binding the buffer without touching the EglSlots.
     status_t bindUnslottedBufferLocked(EGLDisplay dpy);
+
+    // returns a graphic buffer used when the texture image has been released
+    static sp<GraphicBuffer> getDebugTexImageBuffer();
 
     // The default consumer usage flags that GLConsumer always sets on its
     // BufferQueue instance; these will be OR:d with any additional flags passed
@@ -338,6 +349,10 @@ private:
     // gets set each time updateTexImage is called.
     int64_t mCurrentTimestamp;
 
+    // mCurrentFrameNumber is the frame counter for the current texture.
+    // It gets set each time updateTexImage is called.
+    int64_t mCurrentFrameNumber;
+
     uint32_t mDefaultWidth, mDefaultHeight;
 
     // mFilteringEnabled indicates whether the transform matrix is computed for
@@ -348,7 +363,7 @@ private:
     // mTexName is the name of the OpenGL texture to which streamed images will
     // be bound when updateTexImage is called. It is set at construction time
     // and can be changed with a call to attachToContext.
-    GLuint mTexName;
+    uint32_t mTexName;
 
     // mUseFenceSync indicates whether creation of the EGL_KHR_fence_sync
     // extension should be used to prevent buffers from being dequeued before
@@ -363,7 +378,7 @@ private:
     // glCopyTexSubImage to read from the texture.  This is a hack to work
     // around a GL driver limitation on the number of FBO attachments, which the
     // browser's tile cache exceeds.
-    const GLenum mTexTarget;
+    const uint32_t mTexTarget;
 
     // EGLSlot contains the information and object references that
     // GLConsumer maintains about a BufferQueue buffer slot.
@@ -375,6 +390,10 @@ private:
 
         // mEglImage is the EGLImage created from mGraphicBuffer.
         EGLImageKHR mEglImage;
+
+        // mCropRect is the crop rectangle passed to EGL when mEglImage was
+        // created.
+        Rect mCropRect;
 
         // mFence is the EGL sync object that must signal before the buffer
         // associated with this buffer slot may be dequeued. It is initialized
@@ -412,6 +431,9 @@ private:
     // reset mCurrentTexture to INVALID_BUFFER_SLOT.
     int mCurrentTexture;
 
+    // mVideoSessionID indicates video session ID
+    uint32_t mVideoSessionID;
+
     // mAttached indicates whether the ConsumerBase is currently attached to
     // an OpenGL ES context.  For legacy reasons, this is initialized to true,
     // indicating that the ConsumerBase is considered to be attached to
@@ -419,6 +441,13 @@ private:
     // It is set to false by detachFromContext, and then set to true again by
     // attachToContext.
     bool mAttached;
+
+    // protects static initialization
+    static Mutex sStaticInitLock;
+
+    // mReleasedTexImageBuffer is a dummy buffer used when in single buffer
+    // mode and releaseTexImage() has been called
+    static sp<GraphicBuffer> sReleasedTexImageBuffer;
 };
 
 // ----------------------------------------------------------------------------

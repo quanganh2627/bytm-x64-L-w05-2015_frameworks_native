@@ -48,7 +48,7 @@ class Region;
 class SurfaceComposerClient : public RefBase
 {
     friend class Composer;
-public:    
+public:
                 SurfaceComposerClient();
     virtual     ~SurfaceComposerClient();
 
@@ -57,7 +57,7 @@ public:
 
     // Return the connection of this client
     sp<IBinder> connection() const;
-    
+
     // Forcibly remove connection before all references have gone away.
     void        dispose();
 
@@ -67,6 +67,7 @@ public:
 
     // Get information about a display
     static status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
+    static bool isAnimationPermitted();
 
     /* triggers screen off and waits for it to complete */
     static void blankDisplay(const sp<IBinder>& display);
@@ -86,8 +87,11 @@ public:
             uint32_t flags = 0  // usage flags
     );
 
-    //! Create a display
+    //! Create a virtual display
     static sp<IBinder> createDisplay(const String8& displayName, bool secure);
+
+    //! Destroy a virtual display
+    static void destroyDisplay(const sp<IBinder>& display);
 
     //! Get the token for the existing default displays.
     //! Possible values for id are eDisplayIdMain and eDisplayIdHdmi.
@@ -165,6 +169,7 @@ public:
 
 private:
     mutable sp<CpuConsumer> mCpuConsumer;
+    mutable sp<BufferQueue> mBufferQueue;
     CpuConsumer::LockedBuffer mBuffer;
     bool mHaveBuffer;
 

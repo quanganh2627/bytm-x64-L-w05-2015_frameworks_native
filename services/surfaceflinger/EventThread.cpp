@@ -24,6 +24,7 @@
 #include <gui/BitTube.h>
 #include <gui/IDisplayEventConnection.h>
 #include <gui/DisplayEventReceiver.h>
+#include <cutils/properties.h>
 
 #include <utils/Errors.h>
 #include <utils/String8.h>
@@ -36,12 +37,14 @@
 namespace android {
 // ---------------------------------------------------------------------------
 
-EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
-    : mFlinger(flinger),
+EventThread::EventThread(const sp<VSyncSource>& src)
+    : mVSyncSource(src),
       mUseSoftwareVSync(false),
+      mVsyncEnabled(false),
+      mVsyncDisabled(false),
       mDebugVsyncEnabled(false) {
 
-    for (int32_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
+    for (int32_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
         mVSyncEvent[i].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
         mVSyncEvent[i].header.id = 0;
         mVSyncEvent[i].header.timestamp = 0;
@@ -50,6 +53,9 @@ EventThread::EventThread(const sp<SurfaceFlinger>& flinger)
 }
 
 void EventThread::onFirstRef() {
+    char vsyncValue[92] = {'\0'};
+    if (property_get("vsync.disable", vsyncValue, NULL))
+        mVsyncDisabled = atoi(vsyncValue);
     run("EventThread", PRIORITY_URGENT_DISPLAY + PRIORITY_MORE_FAVORABLE);
 }
 
@@ -88,8 +94,17 @@ void EventThread::requestNextVsync(
     Mutex::Autolock _l(mLock);
     if (connection->count < 0) {
         connection->count = 0;
+        if (mVsyncDisabled) {
+            // FIXME: how do we decide which display id the fake
+            // vsync came from ?
+            mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
+            mVSyncEvent[0].header.id = HWC_DISPLAY_PRIMARY;
+            mVSyncEvent[0].header.timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+            mVSyncEvent[0].vsync.count++;
+        }
         mCondition.broadcast();
     }
+
 }
 
 void EventThread::onScreenReleased() {
@@ -110,27 +125,21 @@ void EventThread::onScreenAcquired() {
     }
 }
 
-
-void EventThread::onVSyncReceived(int type, nsecs_t timestamp) {
-    ALOGE_IF(type >= HWC_NUM_DISPLAY_TYPES,
-            "received vsync event for an invalid display (id=%d)", type);
-
+void EventThread::onVSyncEvent(nsecs_t timestamp) {
     Mutex::Autolock _l(mLock);
-    if (type < HWC_NUM_DISPLAY_TYPES) {
-        mVSyncEvent[type].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
-        mVSyncEvent[type].header.id = type;
-        mVSyncEvent[type].header.timestamp = timestamp;
-        mVSyncEvent[type].vsync.count++;
-        mCondition.broadcast();
-    }
+    mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
+    mVSyncEvent[0].header.id = 0;
+    mVSyncEvent[0].header.timestamp = timestamp;
+    mVSyncEvent[0].vsync.count++;
+    mCondition.broadcast();
 }
 
 void EventThread::onHotplugReceived(int type, bool connected) {
-    ALOGE_IF(type >= HWC_NUM_DISPLAY_TYPES,
+    ALOGE_IF(type >= DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES,
             "received hotplug event for an invalid display (id=%d)", type);
 
     Mutex::Autolock _l(mLock);
-    if (type < HWC_NUM_DISPLAY_TYPES) {
+    if (type < DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES) {
         DisplayEventReceiver::Event event;
         event.header.type = DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG;
         event.header.id = type;
@@ -184,7 +193,7 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 
         size_t vsyncCount = 0;
         nsecs_t timestamp = 0;
-        for (int32_t i=0 ; i<HWC_NUM_DISPLAY_TYPES ; i++) {
+        for (int32_t i=0 ; i<DisplayDevice::NUM_BUILTIN_DISPLAY_TYPES ; i++) {
             timestamp = mVSyncEvent[i].header.timestamp;
             if (timestamp) {
                 // we have a vsync event to dispatch
@@ -285,7 +294,7 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
                     // FIXME: how do we decide which display id the fake
                     // vsync came from ?
                     mVSyncEvent[0].header.type = DisplayEventReceiver::DISPLAY_EVENT_VSYNC;
-                    mVSyncEvent[0].header.id = HWC_DISPLAY_PRIMARY;
+                    mVSyncEvent[0].header.id = DisplayDevice::DISPLAY_PRIMARY;
                     mVSyncEvent[0].header.timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
                     mVSyncEvent[0].vsync.count++;
                 }
@@ -308,19 +317,26 @@ Vector< sp<EventThread::Connection> > EventThread::waitForEvent(
 void EventThread::enableVSyncLocked() {
     if (!mUseSoftwareVSync) {
         // never enable h/w VSYNC when screen is off
-        mFlinger->eventControl(HWC_DISPLAY_PRIMARY, SurfaceFlinger::EVENT_VSYNC, true);
-        mPowerHAL.vsyncHint(true);
+        if (!mVsyncEnabled) {
+            mVsyncEnabled = true;
+            mVSyncSource->setCallback(static_cast<VSyncSource::Callback*>(this));
+            mVSyncSource->setVSyncEnabled(true);
+            mPowerHAL.vsyncHint(true);
+        }
     }
     mDebugVsyncEnabled = true;
 }
 
 void EventThread::disableVSyncLocked() {
-    mFlinger->eventControl(HWC_DISPLAY_PRIMARY, SurfaceFlinger::EVENT_VSYNC, false);
-    mPowerHAL.vsyncHint(false);
-    mDebugVsyncEnabled = false;
+    if (mVsyncEnabled) {
+        mVsyncEnabled = false;
+        mVSyncSource->setVSyncEnabled(false);
+        mPowerHAL.vsyncHint(false);
+        mDebugVsyncEnabled = false;
+    }
 }
 
-void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
+void EventThread::dump(String8& result) const {
     Mutex::Autolock _l(mLock);
     result.appendFormat("VSYNC state: %s\n",
             mDebugVsyncEnabled?"enabled":"disabled");
@@ -328,7 +344,7 @@ void EventThread::dump(String8& result, char* buffer, size_t SIZE) const {
             mUseSoftwareVSync?"enabled":"disabled");
     result.appendFormat("  numListeners=%u,\n  events-delivered: %u\n",
             mDisplayEventConnections.size(),
-            mVSyncEvent[HWC_DISPLAY_PRIMARY].vsync.count);
+            mVSyncEvent[DisplayDevice::DISPLAY_PRIMARY].vsync.count);
     for (size_t i=0 ; i<mDisplayEventConnections.size() ; i++) {
         sp<Connection> connection =
                 mDisplayEventConnections.itemAt(i).promote();

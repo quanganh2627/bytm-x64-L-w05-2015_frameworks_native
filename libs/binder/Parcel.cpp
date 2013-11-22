@@ -22,12 +22,13 @@
 #include <binder/IPCThreadState.h>
 #include <binder/Binder.h>
 #include <binder/BpBinder.h>
-#include <utils/Debug.h>
 #include <binder/ProcessState.h>
+#include <binder/TextOutput.h>
+
+#include <utils/Debug.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include <utils/String16.h>
-#include <utils/TextOutput.h>
 #include <utils/misc.h>
 #include <utils/Flattenable.h>
 #include <cutils/ashmem.h>
@@ -797,13 +798,13 @@ status_t Parcel::writeBlob(size_t len, WritableBlob* outBlob)
     return status;
 }
 
-status_t Parcel::write(const Flattenable& val)
+status_t Parcel::write(const FlattenableHelperInterface& val)
 {
     status_t err;
 
     // size if needed
-    size_t len = val.getFlattenedSize();
-    size_t fd_count = val.getFdCount();
+    const size_t len = val.getFlattenedSize();
+    const size_t fd_count = val.getFdCount();
 
     err = this->writeInt32(len);
     if (err) return err;
@@ -812,7 +813,7 @@ status_t Parcel::write(const Flattenable& val)
     if (err) return err;
 
     // payload
-    void* buf = this->writeInplace(PAD_SIZE(len));
+    void* const buf = this->writeInplace(PAD_SIZE(len));
     if (buf == NULL)
         return BAD_VALUE;
 
@@ -1173,14 +1174,14 @@ status_t Parcel::readBlob(size_t len, ReadableBlob* outBlob) const
     return NO_ERROR;
 }
 
-status_t Parcel::read(Flattenable& val) const
+status_t Parcel::read(FlattenableHelperInterface& val) const
 {
     // size
     const size_t len = this->readInt32();
     const size_t fd_count = this->readInt32();
 
     // payload
-    void const* buf = this->readInplace(PAD_SIZE(len));
+    void const* const buf = this->readInplace(PAD_SIZE(len));
     if (buf == NULL)
         return BAD_VALUE;
 
@@ -1470,8 +1471,11 @@ status_t Parcel::continueWrite(size_t desired)
         size_t* objects = NULL;
         
         if (objectsSize) {
-            objects = (size_t*)malloc(objectsSize*sizeof(size_t));
+            //valgrind warning fix: it is necessary to initialize the allocated memory
+            objects = (size_t*)calloc(objectsSize, sizeof(size_t));
             if (!objects) {
+                free(data);
+
                 mError = NO_MEMORY;
                 return NO_MEMORY;
             }
@@ -1547,12 +1551,13 @@ status_t Parcel::continueWrite(size_t desired)
         
     } else {
         // This is the first data.  Easy!
-        uint8_t* data = (uint8_t*)malloc(desired);
+        //valgrind warning fix: it is necessary to initialize the allocated memory
+        uint8_t* data = (uint8_t*)calloc(desired, sizeof(uint8_t));
         if (!data) {
             mError = NO_MEMORY;
             return NO_MEMORY;
         }
-        
+
         if(!(mDataCapacity == 0 && mObjects == NULL
              && mObjectsCapacity == 0)) {
             ALOGE("continueWrite: %d/%p/%d/%d", mDataCapacity, mObjects, mObjectsCapacity, desired);

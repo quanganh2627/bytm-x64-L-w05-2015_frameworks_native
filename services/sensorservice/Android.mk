@@ -13,9 +13,12 @@ LOCAL_SRC_FILES:= \
     SensorFusion.cpp \
     SensorInterface.cpp \
     SensorService.cpp \
-
+    VirtualOrientationSensor.cpp \
+    SecondOrderLowPassFilter.cpp
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SensorService\"
+
+LOCAL_CFLAGS += -fvisibility=hidden
 
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
@@ -27,8 +30,24 @@ LOCAL_SHARED_LIBRARIES := \
 	libui \
 	libgui
 
-
-
 LOCAL_MODULE:= libsensorservice
 
 include $(BUILD_SHARED_LIBRARY)
+
+#####################################################################
+# build executable
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES:= \
+	main_sensorservice.cpp
+
+LOCAL_SHARED_LIBRARIES := \
+	libsensorservice \
+	libbinder \
+	libutils
+
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_MODULE:= sensorservice
+
+include $(BUILD_EXECUTABLE)
