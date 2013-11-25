@@ -30,6 +30,10 @@
 #include <gui/ISurfaceComposer.h>
 #include <gui/IGraphicBufferProducer.h>
 
+#ifdef INTEL_FEATURE_ARKHAM
+#include <cutils/properties.h>
+#endif
+
 #include <private/gui/LayerState.h>
 
 #include <ui/DisplayInfo.h>
@@ -287,6 +291,13 @@ status_t BnSurfaceComposer::onTransact(
         }
         case CAPTURE_SCREEN: {
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
+#ifdef INTEL_FEATURE_ARKHAM
+            /* ARKHAM-336 disable screen capture when container is active */
+            char prop[PROPERTY_VALUE_MAX];
+            if ((property_get("sys.container", prop, NULL) > 0) && ((strcmp(prop, "true")) == 0)) {
+                return NO_ERROR;
+            }
+#endif
             sp<IBinder> display = data.readStrongBinder();
             sp<IGraphicBufferProducer> producer =
                     interface_cast<IGraphicBufferProducer>(data.readStrongBinder());

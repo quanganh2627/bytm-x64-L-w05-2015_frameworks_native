@@ -40,6 +40,10 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog
 
 
+ifeq ($(INTEL_FEATURE_ARKHAM),true)
+LOCAL_CFLAGS += -DINTEL_FEATURE_ARKHAM
+endif
+
 LOCAL_MODULE:= libgui
 
 ifeq ($(TARGET_BOARD_PLATFORM), tegra)
