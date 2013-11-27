@@ -273,7 +273,7 @@ status_t VirtualDisplaySurface::dequeueBuffer(Source source,
     int pslot = mapSource2ProducerSlot(source, *sslot);
     VDS_LOGV("dequeueBuffer(%s): sslot=%d pslot=%d result=%d",
             dbgSourceStr(source), *sslot, pslot, result);
-    uint32_t sourceBit = static_cast<uint32_t>(source) << pslot;
+    uint64_t sourceBit = static_cast<uint64_t>(source) << pslot;
 
     if ((mProducerSlotSource & (1u << pslot)) != sourceBit) {
         // This slot was previously dequeued from the other source; must
