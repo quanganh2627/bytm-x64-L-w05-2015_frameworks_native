@@ -151,7 +151,7 @@ private:
     // dequeueBuffer. Each bit in mLastSlotSource corresponds to a producer
     // slot. Both mProducerSlotSource and mProducerBuffers are indexed by a
     // "producer slot"; see the mapSlot*() functions.
-    uint32_t mProducerSlotSource;
+    uint64_t mProducerSlotSource;
     sp<GraphicBuffer> mProducerBuffers[BufferQueue::NUM_BUFFER_SLOTS];
 
     // The QueueBufferOutput with the latest info from the sink, and with the
