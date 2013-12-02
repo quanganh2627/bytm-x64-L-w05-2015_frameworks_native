@@ -58,11 +58,14 @@ static void dumpstate() {
     property_get("ro.baseband", radio, "(unknown)");
     property_get("ro.bootloader", bootloader, "(unknown)");
     property_get("gsm.operator.alpha", network, "(unknown)");
-    time_tmp = localtime((const time_t *)&now);
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", time_tmp);
 
     printf("========================================================\n");
-    printf("== dumpstate: %s\n", date);
+    if ((time_tmp = localtime((const time_t *)&now))) {
+        strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", time_tmp);
+        printf("== dumpstate: %s\n", date);
+    }
+    else
+         printf("== dumpstate: (unknown)\n");
     printf("========================================================\n");
 
     printf("\n");
@@ -450,10 +453,12 @@ int main(int argc, char *argv[]) {
         if (do_add_date) {
             char date[80];
             time_t now = time(NULL);
-            struct tm *time_tmp = NULL;
-            time_tmp = localtime((const time_t *)&now);
-            strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
-            strlcat(path, date, sizeof(path));
+            struct tm *time_tmp;
+            if ((time_tmp = localtime((const time_t *)&now))) {
+                strftime(date, sizeof(date), "-%Y-%m-%d-%H-%M-%S", time_tmp);
+                strlcat(path, date, sizeof(path));
+            } else
+                strlcat(path, "unknown", sizeof(path));
         }
         if (do_fb) {
             strlcpy(screenshot_path, path, sizeof(screenshot_path));
