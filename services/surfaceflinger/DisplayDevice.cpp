@@ -97,8 +97,15 @@ DisplayDevice::DisplayDevice(
     EGLint w, h;
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     surface = eglCreateWindowSurface(display, config, window, NULL);
-    eglQuerySurface(display, surface, EGL_WIDTH,  &mDisplayWidth);
-    eglQuerySurface(display, surface, EGL_HEIGHT, &mDisplayHeight);
+
+    if (surface == EGL_NO_SURFACE) {
+        ALOGE("Failed to create display surface");
+        mDisplayWidth = 0;
+        mDisplayHeight = 0;
+    } else {
+        eglQuerySurface(display, surface, EGL_WIDTH,  &mDisplayWidth);
+        eglQuerySurface(display, surface, EGL_HEIGHT, &mDisplayHeight);
+    }
 
     mDisplay = display;
     mSurface = surface;
