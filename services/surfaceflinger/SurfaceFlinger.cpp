@@ -2685,6 +2685,14 @@ bool SurfaceFlinger::startDdmConnection()
 status_t SurfaceFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    /***************************************
+     *  intel customization
+     **************************************/
+    enum {
+        eIntelHDMISetting = 2001,
+        eIntelQueryPresentationMode,
+        eIntelPauseExternalDisplay
+    };
     switch (code) {
         case CREATE_CONNECTION:
         case CREATE_DISPLAY:
@@ -2718,6 +2726,12 @@ status_t SurfaceFlinger::onTransact(
                 return PERMISSION_DENIED;
             }
             break;
+        }
+        case eIntelQueryPresentationMode: {
+            bool r = isPresentationMode();
+            ALOGD("is presetation mode %d" , r);
+            reply->writeInt32(r ? 1 : 0);
+            return NO_ERROR;
         }
     }
 
@@ -2799,32 +2813,16 @@ status_t SurfaceFlinger::onTransact(
                 mDaltonize = n > 0;
                 invalidateHwcGeometry();
                 repaintEverything();
+                return NO_ERROR;
             }
-            return NO_ERROR;
-            /***************************************
-             *  intel customization start below
-             **************************************/
-
-            enum {
-                eIntelHDMISetting = 2001,
-                eIntelQueryPresentationMode,
-                eIntelPauseExternalDisplay
-            };
             case eIntelHDMISetting: {
                 n = data.readInt32();
-                ALOGD("setting HDMI scaling %d ", n); 
+                ALOGD("setting HDMI scaling %d ", n);
                 int32_t result = setDisplayScaling((uint32_t)n);
                 n = data.readInt32();
                 reply->writeInt32(result);
                 return NO_ERROR;
             }
-            case eIntelQueryPresentationMode: {
-                bool r = isPresentationMode();
-                ALOGD("is presetation mode %d" , r);
-                reply->writeInt32(r ? 1 : 0);
-                return NO_ERROR;
-            }
-
             case eIntelPauseExternalDisplay: {//pause external display
                 n = data.readInt32();
                 bool status = (n == 0 ? true : false);
