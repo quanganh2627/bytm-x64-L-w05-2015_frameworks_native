@@ -34,6 +34,9 @@ static struct {
     { AID_MEDIA, "media.audio_policy" },
     { AID_MEDIA, "media.gti_service"},
     { AID_DRM,   "drm.drmManager" },
+#ifdef INTEL_WIDI
+    { AID_MEDIA, "media.widi" },
+#endif
     { AID_NFC,   "nfc" },
     { AID_BLUETOOTH, "bluetooth" },
     { AID_RADIO, "radio.phone" },
