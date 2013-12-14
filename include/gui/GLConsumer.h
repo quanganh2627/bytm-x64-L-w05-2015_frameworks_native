@@ -85,6 +85,8 @@ public:
             uint32_t tex, uint32_t texureTarget = TEXTURE_EXTERNAL,
             bool useFenceSync = true, bool isControlledByApp = false);
 
+    virtual ~GLConsumer();
+
     // updateTexImage acquires the most recently queued buffer, and sets the
     // image contents of the target texture to it.
     //
@@ -190,6 +192,9 @@ public:
     // set the name of the GLConsumer that will be used to identify it in
     // log messages.
     void setName(const String8& name);
+
+    // getVideoSessionID returns video session ID
+    uint32_t getVideoSessionID() const;
 
     // These functions call the corresponding BufferQueue implementation
     // so the refactoring can proceed smoothly
@@ -425,6 +430,9 @@ private:
     // that no buffer is bound to the texture. A call to setBufferCount will
     // reset mCurrentTexture to INVALID_BUFFER_SLOT.
     int mCurrentTexture;
+
+    // mVideoSessionID indicates video session ID
+    uint32_t mVideoSessionID;
 
     // mAttached indicates whether the ConsumerBase is currently attached to
     // an OpenGL ES context.  For legacy reasons, this is initialized to true,

@@ -30,6 +30,10 @@
 #include <gui/ISurfaceComposer.h>
 #include <gui/IGraphicBufferProducer.h>
 
+#ifdef INTEL_FEATURE_ARKHAM
+#include <cutils/properties.h>
+#endif
+
 #include <private/gui/LayerState.h>
 
 #include <ui/DisplayInfo.h>
@@ -227,6 +231,15 @@ public:
         memcpy(info, reply.readInplace(sizeof(DisplayInfo)), sizeof(DisplayInfo));
         return reply.readInt32();
     }
+
+    virtual bool isAnimationPermitted()
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISurfaceComposer::getInterfaceDescriptor());
+        remote()->transact(BnSurfaceComposer::IS_ANIMATION_PERMITTED, data, &reply);
+        bool result = reply.readInt32();
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(SurfaceComposer, "android.ui.ISurfaceComposer");
@@ -278,6 +291,13 @@ status_t BnSurfaceComposer::onTransact(
         }
         case CAPTURE_SCREEN: {
             CHECK_INTERFACE(ISurfaceComposer, data, reply);
+#ifdef INTEL_FEATURE_ARKHAM
+            /* ARKHAM-336 disable screen capture when container is active */
+            char prop[PROPERTY_VALUE_MAX];
+            if ((property_get("sys.container", prop, NULL) > 0) && ((strcmp(prop, "true")) == 0)) {
+                return NO_ERROR;
+            }
+#endif
             sp<IBinder> display = data.readStrongBinder();
             sp<IGraphicBufferProducer> producer =
                     interface_cast<IGraphicBufferProducer>(data.readStrongBinder());
@@ -343,6 +363,12 @@ status_t BnSurfaceComposer::onTransact(
             sp<IBinder> display = data.readStrongBinder();
             status_t result = getDisplayInfo(display, &info);
             memcpy(reply->writeInplace(sizeof(DisplayInfo)), &info, sizeof(DisplayInfo));
+            reply->writeInt32(result);
+            return NO_ERROR;
+        }
+        case IS_ANIMATION_PERMITTED: {
+            CHECK_INTERFACE(ISurfaceComposer, data, reply);
+            int32_t result = isAnimationPermitted() ? 1 : 0;
             reply->writeInt32(result);
             return NO_ERROR;
         }

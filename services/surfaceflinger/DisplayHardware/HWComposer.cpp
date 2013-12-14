@@ -605,7 +605,7 @@ status_t HWComposer::prepare() {
         mLists[i] = disp.list;
         if (mLists[i]) {
             if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_3)) {
-                mLists[i]->outbuf = NULL;
+                mLists[i]->outbuf = disp.outbufHandle;
                 mLists[i]->outbufAcquireFenceFd = -1;
             } else if (hwcHasApiVersion(mHwc, HWC_DEVICE_API_VERSION_1_1)) {
                 // garbage data to catch improper use
@@ -903,6 +903,9 @@ public:
         } else {
             getLayer()->flags &= ~HWC_SKIP_LAYER;
         }
+    }
+    virtual void setVideoSessionID(uint32_t sessionID) {
+        getLayer()->flags |= sessionID;
     }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;

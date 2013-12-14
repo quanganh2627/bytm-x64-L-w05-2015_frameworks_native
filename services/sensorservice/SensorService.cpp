@@ -45,6 +45,7 @@
 #include "GravitySensor.h"
 #include "LinearAccelerationSensor.h"
 #include "OrientationSensor.h"
+#include "VirtualOrientationSensor.h"
 #include "RotationVectorSensor.h"
 #include "SensorFusion.h"
 #include "SensorService.h"
@@ -80,6 +81,8 @@ void SensorService::onFirstRef()
         if (count > 0) {
             ssize_t orientationIndex = -1;
             bool hasGyro = false;
+            bool hasMag = false;
+            bool hasAccel = false;
             uint32_t virtualSensorsNeeds =
                     (1<<SENSOR_TYPE_GRAVITY) |
                     (1<<SENSOR_TYPE_LINEAR_ACCELERATION) |
@@ -96,6 +99,12 @@ void SensorService::onFirstRef()
                     case SENSOR_TYPE_GYROSCOPE_UNCALIBRATED:
                         hasGyro = true;
                         break;
+                    case SENSOR_TYPE_ACCELEROMETER:
+                        hasAccel = true;
+                        break;
+                    case SENSOR_TYPE_MAGNETIC_FIELD:
+                        hasMag = true;
+                        break;
                     case SENSOR_TYPE_GRAVITY:
                     case SENSOR_TYPE_LINEAR_ACCELERATION:
                     case SENSOR_TYPE_ROTATION_VECTOR:
@@ -104,6 +113,14 @@ void SensorService::onFirstRef()
                 }
             }
 
+            if (hasAccel && hasMag && !hasGyro) {
+                // CTS test defines device has to support orientation sensor
+                // if accelerometer sensor and magnetic sensor are available.
+                // However framework does not provide orientation sensor if
+                // no gyro available.
+                // This provide a orientation sensor without fusion support.
+                registerVirtualSensor( new VirtualOrientationSensor(list, count) );
+            }
             // it's safe to instantiate the SensorFusion object here
             // (it wants to be instantiated after h/w sensors have been
             // registered)
@@ -137,7 +154,11 @@ void SensorService::onFirstRef()
                 if (virtualSensorsNeeds & (1<<SENSOR_TYPE_ROTATION_VECTOR)) {
                     // if we are doing our own rotation-vector, also add
                     // the orientation sensor and remove the HAL provided one.
-                    mUserSensorList.replaceAt(aSensor, orientationIndex);
+                    // add orientation sensor if there is not one
+                    if (orientationIndex < 0)
+                        mUserSensorList.add(aSensor);
+                    else
+                        mUserSensorList.replaceAt(aSensor, orientationIndex);
                 }
 
                 // virtual debugging sensors are not added to mUserSensorList
@@ -478,6 +499,11 @@ String8 SensorService::getSensorName(int handle) const {
     }
     String8 result("unknown");
     return result;
+}
+
+bool SensorService::isVirtualSensor(int handle) const {
+    SensorInterface* sensor = mSensorMap.valueFor(handle);
+    return sensor->isVirtual();
 }
 
 Vector<Sensor> SensorService::getSensorList()
@@ -858,6 +884,11 @@ status_t SensorService::SensorEventConnection::sendEvents(
         }
     }
 
+    // Early return if there are no events for this connection.
+    if (count == 0) {
+        return status_t(NO_ERROR);
+    }
+
     // NOTE: ASensorEvent and sensors_event_t are the same type
     ssize_t size = SensorEventQueue::write(mChannel,
             reinterpret_cast<ASensorEvent const*>(scratch), count);
@@ -922,7 +953,7 @@ status_t  SensorService::SensorEventConnection::flush() {
     // Loop through all sensors for this connection and call flush on each of them.
     for (size_t i = 0; i < mSensorInfo.size(); ++i) {
         const int handle = mSensorInfo.keyAt(i);
-        if (halVersion < SENSORS_DEVICE_API_VERSION_1_1) {
+        if (halVersion < SENSORS_DEVICE_API_VERSION_1_1 || mService->isVirtualSensor(handle)) {
             // For older devices just increment pending flush count which will send a trivial
             // flush complete event.
             FlushInfo& flushInfo = mSensorInfo.editValueFor(handle);

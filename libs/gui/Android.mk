@@ -40,6 +40,10 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog
 
 
+ifeq ($(INTEL_FEATURE_ARKHAM),true)
+LOCAL_CFLAGS += -DINTEL_FEATURE_ARKHAM
+endif
+
 LOCAL_MODULE:= libgui
 
 ifeq ($(TARGET_BOARD_PLATFORM), tegra)
@@ -47,6 +51,16 @@ ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 endif
 ifeq ($(TARGET_BOARD_PLATFORM), tegra3)
 	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
+	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
+	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
+endif
+
+# for VPP support on MRFLD only
+ifeq ($(TARGET_HAS_VPP),true)
+    LOCAL_CFLAGS += -DGFX_BUF_EXT
 endif
 
 include $(BUILD_SHARED_LIBRARY)

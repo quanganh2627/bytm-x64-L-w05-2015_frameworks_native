@@ -33,6 +33,9 @@
 #include <utils/Trace.h>
 #include <utils/CallStack.h>
 
+static const nsecs_t DEQUEUE_TIMEOUT_VALUE = seconds(5);
+
+
 // Macros for including the BufferQueue name in log messages
 #define ST_LOGV(x, ...) ALOGV("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
 #define ST_LOGD(x, ...) ALOGD("[%s] "x, mConsumerName.string(), ##__VA_ARGS__)
@@ -368,7 +371,10 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence, bool async
                     ST_LOGE("dequeueBuffer: would block! returning an error instead.");
                     return WOULD_BLOCK;
                 }
-                mDequeueCondition.wait(mMutex);
+                if (mDequeueCondition.waitRelative(mMutex, DEQUEUE_TIMEOUT_VALUE)) {
+                    ST_LOGE("dequeueBuffer: time out and will free all buffer!");
+                    freeAllBuffersLocked();
+                }
             }
         }
 
@@ -426,6 +432,7 @@ status_t BufferQueue::dequeueBuffer(int *outBuf, sp<Fence>* outFence, bool async
 
     if (returnFlags & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
         status_t error;
+        mGraphicBufferAlloc->acquireBufferReferenceSlot(*outBuf);
         sp<GraphicBuffer> graphicBuffer(
                 mGraphicBufferAlloc->createGraphicBuffer(w, h, format, usage, &error));
         if (graphicBuffer == 0) {
@@ -481,6 +488,14 @@ status_t BufferQueue::queueBuffer(int buf,
 
     input.deflate(&timestamp, &isAutoTimestamp, &crop, &scalingMode, &transform,
             &async, &fence);
+
+    uint32_t sessionId = 0;
+    if (scalingMode & (1 << 29)) {
+        sessionId = (1 << 29);
+        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
+        scalingMode &= ~(1 << 29);
+        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
+    }
 
     if (fence == NULL) {
         ST_LOGE("queueBuffer: fence is NULL");
@@ -566,6 +581,7 @@ status_t BufferQueue::queueBuffer(int buf,
         item.mBuf = buf;
         item.mFence = fence;
         item.mIsDroppable = mDequeueBufferCannotBlock || async;
+        item.mVideoSessionID = sessionId;
 
         if (mQueue.empty()) {
             // when the queue is empty, we can ignore "mDequeueBufferCannotBlock", and
@@ -644,6 +660,7 @@ status_t BufferQueue::connect(const sp<IBinder>& token,
             producerControlledByApp ? "true" : "false");
     Mutex::Autolock lock(mMutex);
 
+retry:
     if (mAbandoned) {
         ST_LOGE("connect: BufferQueue has been abandoned!");
         return NO_INIT;
@@ -654,29 +671,41 @@ status_t BufferQueue::connect(const sp<IBinder>& token,
         return NO_INIT;
     }
 
+    if (mConnectedApi != NO_CONNECTED_API) {
+        ST_LOGE("connect: already connected (cur=%d, req=%d)",
+                mConnectedApi, api);
+        return -EINVAL;
+    }
+
+    // If we disconnect and reconnect quickly, we can be in a state where our slots are
+    // empty but we have many buffers in the queue.  This can cause us to run out of
+    // memory if we outrun the consumer.  Wait here if it looks like we have too many
+    // buffers queued up.
+    int maxBufferCount = getMaxBufferCountLocked(false);    // worst-case, i.e. largest value
+    if (mQueue.size() > (size_t) maxBufferCount) {
+        // TODO: make this bound tighter?
+        ST_LOGV("queue size is %d, waiting", mQueue.size());
+        mDequeueCondition.wait(mMutex);
+        goto retry;
+    }
+
     int err = NO_ERROR;
     switch (api) {
         case NATIVE_WINDOW_API_EGL:
         case NATIVE_WINDOW_API_CPU:
         case NATIVE_WINDOW_API_MEDIA:
         case NATIVE_WINDOW_API_CAMERA:
-            if (mConnectedApi != NO_CONNECTED_API) {
-                ST_LOGE("connect: already connected (cur=%d, req=%d)",
-                        mConnectedApi, api);
-                err = -EINVAL;
-            } else {
-                mConnectedApi = api;
-                output->inflate(mDefaultWidth, mDefaultHeight, mTransformHint, mQueue.size());
+            mConnectedApi = api;
+            output->inflate(mDefaultWidth, mDefaultHeight, mTransformHint, mQueue.size());
 
-                // set-up a death notification so that we can disconnect
-                // automatically when/if the remote producer dies.
-                if (token != NULL && token->remoteBinder() != NULL) {
-                    status_t err = token->linkToDeath(static_cast<IBinder::DeathRecipient*>(this));
-                    if (err == NO_ERROR) {
-                        mConnectedProducerToken = token;
-                    } else {
-                        ALOGE("linkToDeath failed: %s (%d)", strerror(-err), err);
-                    }
+            // set-up a death notification so that we can disconnect
+            // automatically when/if the remote producer dies.
+            if (token != NULL && token->remoteBinder() != NULL) {
+                status_t err = token->linkToDeath(static_cast<IBinder::DeathRecipient*>(this));
+                if (err == NO_ERROR) {
+                    mConnectedProducerToken = token;
+                } else {
+                    ALOGE("linkToDeath failed: %s (%d)", strerror(-err), err);
                 }
             }
             break;
@@ -825,6 +854,7 @@ void BufferQueue::dump(String8& result, const char* prefix) const {
 void BufferQueue::freeBufferLocked(int slot) {
     ST_LOGV("freeBufferLocked: slot=%d", slot);
     mSlots[slot].mGraphicBuffer = 0;
+    mGraphicBufferAlloc->releaseBufferReferenceSlot(slot);
     if (mSlots[slot].mBufferState == BufferSlot::ACQUIRED) {
         mSlots[slot].mNeedsCleanupOnRelease = true;
     }
@@ -1069,7 +1099,7 @@ status_t BufferQueue::consumerDisconnect() {
     return NO_ERROR;
 }
 
-status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
+status_t BufferQueue::getReleasedBuffers(uint64_t* slotMask) {
     ST_LOGV("getReleasedBuffers");
     Mutex::Autolock lock(mMutex);
 
@@ -1078,10 +1108,10 @@ status_t BufferQueue::getReleasedBuffers(uint32_t* slotMask) {
         return NO_INIT;
     }
 
-    uint32_t mask = 0;
+    uint64_t mask = 0;
     for (int i = 0; i < NUM_BUFFER_SLOTS; i++) {
         if (!mSlots[i].mAcquireCalled) {
-            mask |= 1 << i;
+            mask |= (1ULL << i);
         }
     }
 

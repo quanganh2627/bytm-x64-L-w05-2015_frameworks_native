@@ -133,6 +133,7 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
     mEglDisplay(EGL_NO_DISPLAY),
     mEglContext(EGL_NO_CONTEXT),
     mCurrentTexture(BufferQueue::INVALID_BUFFER_SLOT),
+    mVideoSessionID(0),
     mAttached(true)
 {
     ST_LOGV("GLConsumer");
@@ -141,6 +142,11 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
             sizeof(mCurrentTransformMatrix));
 
     mConsumer->setConsumerUsageBits(DEFAULT_USAGE_FLAGS);
+}
+
+GLConsumer::~GLConsumer() {
+    ST_LOGV("~GLConsumer");
+    abandon();
 }
 
 status_t GLConsumer::setDefaultMaxBufferCount(int bufferCount) {
@@ -422,6 +428,7 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
     mCurrentTimestamp = item.mTimestamp;
     mCurrentFence = item.mFence;
     mCurrentFrameNumber = item.mFrameNumber;
+    mVideoSessionID = item.mVideoSessionID;
 
     computeCurrentTransformMatrixLocked();
 
@@ -963,6 +970,11 @@ sp<Fence> GLConsumer::getCurrentFence() const {
 status_t GLConsumer::doGLFenceWait() const {
     Mutex::Autolock lock(mMutex);
     return doGLFenceWaitLocked();
+}
+
+uint32_t GLConsumer::getVideoSessionID() const {
+    Mutex::Autolock lock(mMutex);
+    return mVideoSessionID;
 }
 
 status_t GLConsumer::doGLFenceWaitLocked() const {

@@ -617,6 +617,16 @@ status_t Parcel::writeInt32(int32_t val)
 {
     return writeAligned(val);
 }
+status_t Parcel::writeInt32Array(size_t len, const int32_t *val) {
+    if (!val) {
+        return writeAligned(-1);
+    }
+    status_t ret = writeAligned(len);
+    if (ret == NO_ERROR) {
+        ret = write(val, len * sizeof(*val));
+    }
+    return ret;
+}
 
 status_t Parcel::writeInt64(int64_t val)
 {
@@ -1471,7 +1481,8 @@ status_t Parcel::continueWrite(size_t desired)
         size_t* objects = NULL;
         
         if (objectsSize) {
-            objects = (size_t*)malloc(objectsSize*sizeof(size_t));
+            //valgrind warning fix: it is necessary to initialize the allocated memory
+            objects = (size_t*)calloc(objectsSize, sizeof(size_t));
             if (!objects) {
                 free(data);
 
@@ -1550,7 +1561,8 @@ status_t Parcel::continueWrite(size_t desired)
         
     } else {
         // This is the first data.  Easy!
-        uint8_t* data = (uint8_t*)malloc(desired);
+        //valgrind warning fix: it is necessary to initialize the allocated memory
+        uint8_t* data = (uint8_t*)calloc(desired, sizeof(uint8_t));
         if (!data) {
             mError = NO_MEMORY;
             return NO_MEMORY;

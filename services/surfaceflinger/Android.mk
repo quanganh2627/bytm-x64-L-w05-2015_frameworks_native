@@ -37,6 +37,9 @@ LOCAL_SRC_FILES:= \
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 
+LOCAL_CFLAGS += -DINTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+LOCAL_SRC_FILES +=PauseStrategy.cpp \
+
 ifeq ($(TARGET_BOARD_PLATFORM),omap3)
 	LOCAL_CFLAGS += -DNO_RGBX_8888
 endif
@@ -49,6 +52,10 @@ endif
 
 ifeq ($(TARGET_DISABLE_TRIPLE_BUFFERING),true)
 	LOCAL_CFLAGS += -DTARGET_DISABLE_TRIPLE_BUFFERING
+endif
+
+ifeq ($(TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS),true)
+    LOCAL_CFLAGS += -DFORCE_HWC_COPY_FOR_VIRTUAL_DISPLAYS
 endif
 
 ifneq ($(NUM_FRAMEBUFFER_SURFACE_BUFFERS),)
@@ -81,6 +88,11 @@ endif
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
+# for VPP support on MRFLD only
+ifeq ($(TARGET_HAS_VPP), true)
+    LOCAL_CFLAGS += -DGFX_BUF_EXT
+endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	liblog \
@@ -104,6 +116,8 @@ include $(CLEAR_VARS)
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SurfaceFlinger\"
 
+LOCAL_CFLAGS += -DINTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+
 LOCAL_SRC_FILES:= \
 	main_surfaceflinger.cpp 
 
@@ -113,6 +127,14 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libbinder \
 	libutils
+
+ifeq ($(TARGET_HAS_MULTIPLE_DISPLAY),true)
+ifeq ($(USE_MDS_LEGACY),true)
+    LOCAL_CFLAGS += -DUSE_MDS_LEGACY
+endif
+    LOCAL_SHARED_LIBRARIES += libmultidisplay
+    LOCAL_CFLAGS += -DTARGET_HAS_MULTIPLE_DISPLAY
+endif
 
 LOCAL_MODULE:= surfaceflinger
 

@@ -51,6 +51,7 @@ public:
     enum {
         eSynchronous = 0x01,
         eAnimation   = 0x02,
+        eRotationAnimationInProcess = 0x04,
     };
 
     enum {
@@ -121,6 +122,8 @@ public:
             const sp<IGraphicBufferProducer>& producer,
             uint32_t reqWidth, uint32_t reqHeight,
             uint32_t minLayerZ, uint32_t maxLayerZ) = 0;
+
+    virtual bool isAnimationPermitted() = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -142,6 +145,7 @@ public:
         BLANK,
         UNBLANK,
         GET_DISPLAY_INFO,
+        IS_ANIMATION_PERMITTED,
         CONNECT_DISPLAY,
         CAPTURE_SCREEN,
     };
