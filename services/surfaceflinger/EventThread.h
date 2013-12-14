@@ -124,7 +124,6 @@ private:
 
     // for debugging
     bool mDebugVsyncEnabled;
-    bool mVsyncDisabled;
 };
 
 // ---------------------------------------------------------------------------

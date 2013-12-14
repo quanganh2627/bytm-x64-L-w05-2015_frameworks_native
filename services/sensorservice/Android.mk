@@ -12,9 +12,7 @@ LOCAL_SRC_FILES:= \
     SensorDevice.cpp \
     SensorFusion.cpp \
     SensorInterface.cpp \
-    SensorService.cpp \
-    VirtualOrientationSensor.cpp \
-    SecondOrderLowPassFilter.cpp
+    SensorService.cpp
 
 LOCAL_CFLAGS:= -DLOG_TAG=\"SensorService\"
 

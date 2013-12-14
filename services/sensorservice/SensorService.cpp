@@ -45,7 +45,6 @@
 #include "GravitySensor.h"
 #include "LinearAccelerationSensor.h"
 #include "OrientationSensor.h"
-#include "VirtualOrientationSensor.h"
 #include "RotationVectorSensor.h"
 #include "SensorFusion.h"
 #include "SensorService.h"
@@ -81,8 +80,6 @@ void SensorService::onFirstRef()
         if (count > 0) {
             ssize_t orientationIndex = -1;
             bool hasGyro = false;
-            bool hasMag = false;
-            bool hasAccel = false;
             uint32_t virtualSensorsNeeds =
                     (1<<SENSOR_TYPE_GRAVITY) |
                     (1<<SENSOR_TYPE_LINEAR_ACCELERATION) |
@@ -99,12 +96,6 @@ void SensorService::onFirstRef()
                     case SENSOR_TYPE_GYROSCOPE_UNCALIBRATED:
                         hasGyro = true;
                         break;
-                    case SENSOR_TYPE_ACCELEROMETER:
-                        hasAccel = true;
-                        break;
-                    case SENSOR_TYPE_MAGNETIC_FIELD:
-                        hasMag = true;
-                        break;
                     case SENSOR_TYPE_GRAVITY:
                     case SENSOR_TYPE_LINEAR_ACCELERATION:
                     case SENSOR_TYPE_ROTATION_VECTOR:
@@ -113,14 +104,6 @@ void SensorService::onFirstRef()
                 }
             }
 
-            if (hasAccel && hasMag && !hasGyro) {
-                // CTS test defines device has to support orientation sensor
-                // if accelerometer sensor and magnetic sensor are available.
-                // However framework does not provide orientation sensor if
-                // no gyro available.
-                // This provide a orientation sensor without fusion support.
-                registerVirtualSensor( new VirtualOrientationSensor(list, count) );
-            }
             // it's safe to instantiate the SensorFusion object here
             // (it wants to be instantiated after h/w sensors have been
             // registered)
@@ -154,11 +137,7 @@ void SensorService::onFirstRef()
                 if (virtualSensorsNeeds & (1<<SENSOR_TYPE_ROTATION_VECTOR)) {
                     // if we are doing our own rotation-vector, also add
                     // the orientation sensor and remove the HAL provided one.
-                    // add orientation sensor if there is not one
-                    if (orientationIndex < 0)
-                        mUserSensorList.add(aSensor);
-                    else
-                        mUserSensorList.replaceAt(aSensor, orientationIndex);
+                    mUserSensorList.replaceAt(aSensor, orientationIndex);
                 }
 
                 // virtual debugging sensors are not added to mUserSensorList

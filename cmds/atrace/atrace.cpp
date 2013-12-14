@@ -818,7 +818,7 @@ int main(int argc, char **argv)
                     g_traceOverwrite = true;
                 } else if (!strcmp(long_options[option_index].name, "async_stop")) {
                     async = true;
-                    traceStart = false;
+                    traceStop = false;
                 } else if (!strcmp(long_options[option_index].name, "async_dump")) {
                     async = true;
                     traceStart = false;
@@ -844,10 +844,8 @@ int main(int argc, char **argv)
     }
 
     bool ok = true;
-    if (traceStart) {
-        ok &= setUpTrace();
-        ok &= startTrace();
-    }
+    ok &= setUpTrace();
+    ok &= startTrace();
 
     if (ok && traceStart) {
         printf("capturing trace...");

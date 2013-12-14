@@ -1,9 +1,6 @@
 /* Copyright 2008 The Android Open Source Project
  */
 
-/*
- * Portions contributed by: Intel Corporation
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -35,22 +32,13 @@ static struct {
     { AID_MEDIA, "media.player" },
     { AID_MEDIA, "media.camera" },
     { AID_MEDIA, "media.audio_policy" },
-    { AID_MEDIA, "media.gti_service"},
-#ifdef INTEL_VIDEO_XPROC_SHARING
-    { AID_MEDIA, "media.IntelBufferSharing"},
-#endif
     { AID_DRM,   "drm.drmManager" },
-#ifdef INTEL_WIDI
-    { AID_MEDIA, "media.widi" },
-#endif
     { AID_NFC,   "nfc" },
     { AID_BLUETOOTH, "bluetooth" },
     { AID_RADIO, "radio.phone" },
     { AID_RADIO, "radio.sms" },
     { AID_RADIO, "radio.phonesubinfo" },
     { AID_RADIO, "radio.simphonebook" },
-    { AID_RADIO, "oemtelephony" },
-    { AID_RADIO, "imsservice" },
 /* TODO: remove after phone services are updated: */
     { AID_RADIO, "phone" },
     { AID_RADIO, "sip" },

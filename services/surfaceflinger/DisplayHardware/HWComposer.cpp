@@ -904,9 +904,6 @@ public:
             getLayer()->flags &= ~HWC_SKIP_LAYER;
         }
     }
-    virtual void setVideoSessionID(uint32_t sessionID) {
-        getLayer()->flags |= sessionID;
-    }
     virtual void setBlending(uint32_t blending) {
         getLayer()->blending = blending;
     }

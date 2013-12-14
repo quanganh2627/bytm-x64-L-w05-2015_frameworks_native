@@ -171,15 +171,6 @@ private:
         uint8_t orientation;
         String8 displayName;
         bool isSecure;
-        // customization for HDMI scaling setting
-        union {
-            uint32_t scale;
-            struct {
-                uint16_t scaleMode;
-                uint8_t  scaleStepX;
-                uint8_t  scaleStepY;
-            };
-        };
     };
 
     struct State {
@@ -217,7 +208,6 @@ private:
     // called when screen is turning back on
     virtual void unblank(const sp<IBinder>& display);
     virtual status_t getDisplayInfo(const sp<IBinder>& display, DisplayInfo* info);
-    virtual bool isAnimationPermitted();
 
     /* ------------------------------------------------------------------------
      * DeathRecipient interface
@@ -397,16 +387,6 @@ private:
      void disableHardwareVsync(bool makeUnavailable);
      void resyncToHardwareVsync(bool makeAvailable);
 
-    // Intel feature : HDMI setting
-
-    int setDisplayScaling(uint32_t scale);
-    // handleDisplayScaling: calculate and modify the scaled frame rect.
-    void handleDisplayScaling(const DisplayDeviceState& state,
-        Rect& viewport, Rect& frame);
-
-    // Intel feature : queryIfpresnetationMode
-    bool isPresentationMode();
-
     /* ------------------------------------------------------------------------
      * Debugging & dumpsys
      */
@@ -477,7 +457,6 @@ private:
     volatile nsecs_t mDebugInTransaction;
     nsecs_t mLastTransactionTime;
     bool mBootFinished;
-    bool mAnimFlag;
 
     // these are thread safe
     mutable MessageQueue mEventQueue;
@@ -499,9 +478,6 @@ private:
 
     Daltonizer mDaltonizer;
     bool mDaltonize;
-
-    /* Intel HDMI setting feature*/
-    uint32_t mDisplayScaleState;
 };
 
 }; // namespace android

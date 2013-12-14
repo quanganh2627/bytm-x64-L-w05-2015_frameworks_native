@@ -81,11 +81,6 @@ endif
 
 LOCAL_CFLAGS += -fvisibility=hidden
 
-# for VPP support on MRFLD only
-ifeq ($(TARGET_HAS_VPP), true)
-    LOCAL_CFLAGS += -DGFX_BUF_EXT
-endif
-
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	liblog \
@@ -118,14 +113,6 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libbinder \
 	libutils
-
-ifeq ($(TARGET_HAS_MULTIPLE_DISPLAY),true)
-ifeq ($(USE_MDS_LEGACY),true)
-    LOCAL_CFLAGS += -DUSE_MDS_LEGACY
-endif
-    LOCAL_SHARED_LIBRARIES += libmultidisplay
-    LOCAL_CFLAGS += -DTARGET_HAS_MULTIPLE_DISPLAY
-endif
 
 LOCAL_MODULE:= surfaceflinger
 
