@@ -295,13 +295,14 @@ status_t Fusion::handleAcc(const vec3_t& a) {
 status_t Fusion::handleMag(const vec3_t& m) {
     // the geomagnetic-field should be between 30uT and 60uT
     // reject if too large to avoid spurious magnetic sources
+    status_t status = NO_ERROR;
     const float magFieldSq = length_squared(m);
     if (magFieldSq > MAX_VALID_MAGNETIC_FIELD_SQ) {
-        return BAD_VALUE;
+        status = BAD_VALUE;
     } else if (magFieldSq < MIN_VALID_MAGNETIC_FIELD_SQ) {
         // Also reject if too small since we will get ill-defined (zero mag)
         // cross-products below
-        return BAD_VALUE;
+        status = BAD_VALUE;
     }
 
     if (!checkInitComplete(MAG, m))
@@ -328,7 +329,7 @@ status_t Fusion::handleMag(const vec3_t& m) {
     north *= l;
 
     update(north, Bm, magSTDEV*l);
-    return NO_ERROR;
+    return status;
 }
 
 void Fusion::checkState() {

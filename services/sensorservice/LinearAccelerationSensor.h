@@ -41,6 +41,8 @@ class LinearAccelerationSensor : public SensorInterface {
 public:
     LinearAccelerationSensor(sensor_t const* list, size_t count);
     virtual status_t activate(void* ident, bool enabled);
+    virtual status_t batch(void* ident, int handle, int flags, int64_t samplingPeriodNs,
+                           int64_t maxBatchReportLatencyNs);
     virtual status_t setDelay(void* ident, int handle, int64_t ns);
     virtual Sensor getSensor() const;
     virtual bool isVirtual() const { return true; }
