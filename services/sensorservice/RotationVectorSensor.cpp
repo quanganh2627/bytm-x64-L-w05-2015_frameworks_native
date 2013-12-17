@@ -53,11 +53,24 @@ bool RotationVectorSensor::process(sensors_event_t* outEvent,
 }
 
 status_t RotationVectorSensor::activate(void* ident, bool enabled) {
-    return mSensorFusion.activate(ident, enabled);
+    status_t status;
+    struct identity* fid = getFusionIdentity(ident);
+    status = mSensorFusion.activate(fid->ident, enabled);
+    if (!enabled)
+        removeFusionIdentity(ident);
+    return status;
+}
+
+status_t RotationVectorSensor::batch(void* ident, int handle, int flags, int64_t samplingPeriodNs,
+                       int64_t maxBatchReportLatencyNs) {
+    struct identity* fid = getFusionIdentity(ident);
+    return mSensorFusion.batch(fid->ident, handle, flags, samplingPeriodNs,
+                               maxBatchReportLatencyNs);
 }
 
 status_t RotationVectorSensor::setDelay(void* ident, int handle, int64_t ns) {
-    return mSensorFusion.setDelay(ident, ns);
+    struct identity* fid = getFusionIdentity(ident);
+    return mSensorFusion.setDelay(fid->ident, ns);
 }
 
 Sensor RotationVectorSensor::getSensor() const {
@@ -102,11 +115,24 @@ bool GyroDriftSensor::process(sensors_event_t* outEvent,
 }
 
 status_t GyroDriftSensor::activate(void* ident, bool enabled) {
-    return mSensorFusion.activate(ident, enabled);
+    status_t status;
+    struct identity* fid = getFusionIdentity(ident);
+    status = mSensorFusion.activate(fid->ident, enabled);
+    if (!enabled)
+        removeFusionIdentity(ident);
+    return status;
+}
+
+status_t GyroDriftSensor::batch(void* ident, int handle, int flags, int64_t samplingPeriodNs,
+                       int64_t maxBatchReportLatencyNs) {
+    struct identity* fid = getFusionIdentity(ident);
+    return mSensorFusion.batch(fid->ident, handle, flags, samplingPeriodNs,
+                               maxBatchReportLatencyNs);
 }
 
 status_t GyroDriftSensor::setDelay(void* ident, int handle, int64_t ns) {
-    return mSensorFusion.setDelay(ident, ns);
+    struct identity* fid = getFusionIdentity(ident);
+    return mSensorFusion.setDelay(fid->ident, ns);
 }
 
 Sensor GyroDriftSensor::getSensor() const {
