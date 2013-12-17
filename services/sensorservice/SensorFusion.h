@@ -50,6 +50,8 @@ class SensorFusion : public Singleton<SensorFusion> {
     vec4_t mAttitude;
     SortedVector<void*> mClients;
 
+    int accuracy;
+
     SensorFusion();
 
 public:
@@ -63,12 +65,16 @@ public:
     float getEstimatedRate() const { return mEstimatedGyroRate; }
 
     status_t activate(void* ident, bool enabled);
+    status_t batch(void* ident, int handle, int flags, int64_t samplingPeriodNs,
+                   int64_t maxBatchReportLatencyNs);
     status_t setDelay(void* ident, int64_t ns);
 
     float getPowerUsage() const;
     int32_t getMinDelay() const;
 
     void dump(String8& result);
+
+    int getAccuracy() { return accuracy; }
 };
 
 
