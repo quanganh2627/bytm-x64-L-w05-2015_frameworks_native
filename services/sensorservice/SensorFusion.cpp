@@ -25,7 +25,8 @@ ANDROID_SINGLETON_STATIC_INSTANCE(SensorFusion)
 
 SensorFusion::SensorFusion()
     : mSensorDevice(SensorDevice::getInstance()),
-      mEnabled(false), mGyroTime(0)
+      mEnabled(false), mGyroTime(0),
+      accuracy(SENSOR_STATUS_UNRELIABLE)
 {
     sensor_t const* list;
     Sensor uncalibratedGyro;
@@ -74,7 +75,11 @@ void SensorFusion::process(const sensors_event_t& event) {
         mGyroTime = event.timestamp;
     } else if (event.type == SENSOR_TYPE_MAGNETIC_FIELD) {
         const vec3_t mag(event.data);
-        mFusion.handleMag(mag);
+        status_t status = mFusion.handleMag(mag);
+        if (status == NO_ERROR)
+                accuracy = SENSOR_STATUS_ACCURACY_HIGH;
+        else
+                accuracy = SENSOR_STATUS_UNRELIABLE;
     } else if (event.type == SENSOR_TYPE_ACCELEROMETER) {
         const vec3_t acc(event.data);
         mFusion.handleAcc(acc);
@@ -100,15 +105,7 @@ status_t SensorFusion::activate(void* ident, bool enabled) {
         if (idx >= 0) {
             mClients.removeItemsAt(idx);
         }
-    }
 
-    if (enabled) {
-        ALOGD_IF(DEBUG_CONNECTIONS, "SensorFusion calling batch ident=%p ", ident);
-        // Activating a sensor in continuous mode is equivalent to calling batch with the default
-        // period and timeout equal to ZERO, followed by a call to activate.
-        mSensorDevice.batch(ident, mAcc.getHandle(), 0, DEFAULT_EVENTS_PERIOD, 0);
-        mSensorDevice.batch(ident, mMag.getHandle(), 0, DEFAULT_EVENTS_PERIOD, 0);
-        mSensorDevice.batch(ident, mGyro.getHandle(), 0, DEFAULT_EVENTS_PERIOD, 0);
     }
 
     mSensorDevice.activate(ident, mAcc.getHandle(), enabled);
@@ -126,10 +123,20 @@ status_t SensorFusion::activate(void* ident, bool enabled) {
     return NO_ERROR;
 }
 
+status_t SensorFusion::batch(void* ident, int handle, int flags, int64_t samplingPeriodNs,
+                             int64_t maxBatchReportLatencyNs) {
+    mSensorDevice.batch(ident, mAcc.getHandle(), 0, samplingPeriodNs, 0);
+    mSensorDevice.batch(ident, mMag.getHandle(), 0, ms2ns(20), 0);
+    mSensorDevice.batch(ident, mGyro.getHandle(), 0, mTargetDelayNs, 0);
+
+    return NO_ERROR;
+}
+
 status_t SensorFusion::setDelay(void* ident, int64_t ns) {
     mSensorDevice.setDelay(ident, mAcc.getHandle(), ns);
     mSensorDevice.setDelay(ident, mMag.getHandle(), ms2ns(20));
     mSensorDevice.setDelay(ident, mGyro.getHandle(), mTargetDelayNs);
+
     return NO_ERROR;
 }
 
