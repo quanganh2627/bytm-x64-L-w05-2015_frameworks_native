@@ -1045,6 +1045,8 @@ void SurfaceFlinger::rebuildLayerStacks() {
             }
 #endif
 
+            hideBackgroundOfGoogleGallery(layers, layersSortedByZ);
+
             hw->setVisibleLayersSortedByZ(layersSortedByZ);
             hw->undefinedRegion.set(bounds);
             hw->undefinedRegion.subtractSelf(tr.transform(opaqueRegion));
@@ -1544,7 +1546,6 @@ void SurfaceFlinger::computeVisibleRegions(
     size_t i = currentLayers.size();
     while (i--) {
         const sp<Layer>& layer = currentLayers[i];
-
         // start with the whole surface at its current location
         const Layer::State& s(layer->getDrawingState());
 
@@ -3415,7 +3416,42 @@ void SurfaceFlinger::rectifyProjectionSetting()
     }
 }
 #endif
+void SurfaceFlinger::hideBackgroundOfGoogleGallery(const LayerVector& layers, Vector< sp<Layer> >& visibleLayers)
+{
+    bool  bGoogleGallery = false;
+    bool  bNavigationBar = false;
+    bool  hasNavigationBar = false;
+    bool  indexofGoogleGallery = 0;
+    String8 strNavigationBar("NavigationBar");
+    String8 strGoogleGallery("com.google.android.gallery3d/com.android.gallery3d.app.MovieActivity");
 
+    for (size_t i=0 ; i<layers.size() ; i++) {
+        const sp<Layer>& layer(layers[i]);
+        if (layer->getName().compare(strNavigationBar) == 0)
+            hasNavigationBar = true;
+    }
+
+    if (!hasNavigationBar)
+        return;
+
+    for (size_t i=0 ; i<visibleLayers.size() ; i++) {
+        const sp<Layer>& layer(visibleLayers[i]);
+        if (layer->getName().compare(strGoogleGallery) == 0){
+            bGoogleGallery = true;
+            indexofGoogleGallery = i;
+        }
+        if (layer->getName().compare(strNavigationBar) == 0){
+            bNavigationBar = true;
+            return;
+        }
+    }
+
+    if (!bNavigationBar){
+        if (bGoogleGallery){
+            visibleLayers.removeAt(indexofGoogleGallery);
+        }
+    }
+}
 }; // namespace android
 
 
