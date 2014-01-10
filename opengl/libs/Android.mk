@@ -54,7 +54,7 @@ endif
 ifeq ($(TARGET_BOARD_PLATFORM), merrifield)
   LOCAL_CFLAGS += -DWORKAROUND_BUG_10194508=1
 endif
-ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
+ifeq ($(TARGET_BOARD_PLATFORM), moorefield)
   LOCAL_CFLAGS += -DWORKAROUND_BUG_10194508=1
 endif
 ifneq ($(MAX_EGL_CACHE_ENTRY_SIZE),)
