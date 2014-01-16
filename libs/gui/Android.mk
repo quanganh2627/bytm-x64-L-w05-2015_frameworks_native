@@ -39,6 +39,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	liblog
 
+ LOCAL_C_INCLUDES += \
+        $(TOP)/frameworks/native/include/media/openmax
 
 ifeq ($(INTEL_FEATURE_ARKHAM),true)
 LOCAL_CFLAGS += -DINTEL_FEATURE_ARKHAM
@@ -56,6 +58,10 @@ endif
 ifeq ($(TARGET_BOARD_PLATFORM), clovertrail)
 	LOCAL_CFLAGS += -DUSE_NATIVE_FENCE_SYNC
 	LOCAL_CFLAGS += -DUSE_WAIT_SYNC
+endif
+ifeq ($(TARGET_BOARD_PLATFORM),baytrail)
+        LOCAL_CFLAGS += -DUSE_GEN_HW
+        LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/ufo
 endif
 
 # for VPP support on MRFLD only

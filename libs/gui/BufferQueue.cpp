@@ -32,7 +32,11 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <utils/CallStack.h>
+#include <OMX_IVCommon.h>
 
+#ifdef USE_GEN_HW
+#include "graphics.h"
+#endif
 static const nsecs_t DEQUEUE_TIMEOUT_VALUE = seconds(5);
 
 
@@ -603,6 +607,24 @@ status_t BufferQueue::queueBuffer(int buf,
                 // and we record the new buffer in the queued list
                 *front = item;
             } else {
+                if ((mQueue.size() >= 2) && (mConnectedApi == NATIVE_WINDOW_API_MEDIA)) {
+#ifndef USE_GEN_HW
+                    if (mSlots[buf].mGraphicBuffer->format == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar ||
+                            mSlots[buf].mGraphicBuffer->format == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled) {
+#else
+                    if (mSlots[buf].mGraphicBuffer->format == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar ||
+                            mSlots[buf].mGraphicBuffer->format == OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled ||
+                            mSlots[buf].mGraphicBuffer->format == HAL_PIXEL_FORMAT_NV12_X_TILED_INTEL ) {
+#endif
+                        Fifo::iterator front(mQueue.begin());
+                        if (stillTracking(front)) {
+                            ALOGW("erase the front buffer!");
+                            mSlots[front->mBuf].mBufferState = BufferSlot::FREE;
+                            mSlots[front->mBuf].mFrameNumber = 0;
+                            mQueue.erase(front);
+                        }
+                    }
+                }
                 mQueue.push_back(item);
                 listener = mConsumerListener;
             }
@@ -659,7 +681,6 @@ status_t BufferQueue::connect(const sp<IBinder>& token,
     ST_LOGV("connect: api=%d producerControlledByApp=%s", api,
             producerControlledByApp ? "true" : "false");
     Mutex::Autolock lock(mMutex);
-
 retry:
     if (mAbandoned) {
         ST_LOGE("connect: BufferQueue has been abandoned!");
