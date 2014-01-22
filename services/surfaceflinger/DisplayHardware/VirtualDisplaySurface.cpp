@@ -56,6 +56,7 @@ VirtualDisplaySurface::VirtualDisplaySurface(HWComposer& hwc, int32_t dispId,
     mDisplayName(name),
     mOutputUsage(GRALLOC_USAGE_HW_COMPOSER),
     mProducerSlotSource(0),
+    mFbFence(Fence::NO_FENCE),
     mDbgState(DBG_STATE_IDLE),
     mDbgLastCompositionType(COMPOSITION_UNKNOWN)
 {
