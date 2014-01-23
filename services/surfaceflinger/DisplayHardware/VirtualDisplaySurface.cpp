@@ -460,6 +460,7 @@ void VirtualDisplaySurface::resetPerFrameState() {
     mSinkBufferHeight = 0;
     mOutputFence = Fence::NO_FENCE;
     mOutputProducerSlot = -1;
+    mFbProducerSlot = -1;
 }
 
 status_t VirtualDisplaySurface::refreshOutputBuffer() {
