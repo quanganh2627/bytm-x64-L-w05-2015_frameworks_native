@@ -44,6 +44,7 @@ static struct {
     { AID_MEDIA, "media.widi" },
 #endif
     { AID_NFC,   "nfc" },
+    { AID_NFC,   "nfc.vendor_ext" },
     { AID_BLUETOOTH, "bluetooth" },
     { AID_RADIO, "radio.phone" },
     { AID_RADIO, "radio.sms" },
