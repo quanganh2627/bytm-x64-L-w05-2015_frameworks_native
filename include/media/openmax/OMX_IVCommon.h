@@ -165,6 +165,8 @@ typedef enum OMX_COLOR_FORMATTYPE {
     
     OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar =  0x7FA00E00,
     OMX_INTEL_COLOR_FormatYUV420PackedSemiPlanar_Tiled =  0x7FA00F00,
+
+    OMX_INTEL_COLOR_FormatHalYV12 = 0x32315659,
  
     OMX_COLOR_FormatMax = 0x7FFFFFFF
 } OMX_COLOR_FORMATTYPE;
