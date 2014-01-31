@@ -17,16 +17,15 @@
 // #define LOG_NDEBUG 0
 #include "VirtualDisplaySurface.h"
 #include "HWComposer.h"
-#include <cutils/properties.h>
 
 // ---------------------------------------------------------------------------
 namespace android {
 // ---------------------------------------------------------------------------
 
 #if defined(FORCE_HWC_COPY_FOR_VIRTUAL_DISPLAYS)
-static bool sForceHwcCopy = true;
+static const bool sForceHwcCopy = true;
 #else
-static bool sForceHwcCopy = false;
+static const bool sForceHwcCopy = false;
 #endif
 
 #define VDS_LOGE(msg, ...) ALOGE("[%s] "msg, \
@@ -63,17 +62,6 @@ VirtualDisplaySurface::VirtualDisplaySurface(HWComposer& hwc, int32_t dispId,
 {
     mSource[SOURCE_SINK] = sink;
     mSource[SOURCE_SCRATCH] = bq;
-
-#ifdef INTEL_WIDI_MERRIFIELD
-    // aosp wireless display will not use intel hwc for color conversion
-    if (sForceHwcCopy) {
-        char propertyVal[PROPERTY_VALUE_MAX];
-        if (property_get("widi.media.implementation", propertyVal, "intel") &&
-                strncmp(propertyVal, "aosp", 4) == 0) {
-            sForceHwcCopy = false;
-        }
-    }
-#endif
 
     resetPerFrameState();
 
