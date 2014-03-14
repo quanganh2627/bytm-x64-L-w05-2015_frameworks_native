@@ -276,15 +276,6 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
         return i;
     }
 
-    // Put a special mds session ID
-    uint32_t sessionID = 0;
-    if (buffer->usage & GRALLOC_USAGE_PRIVATE_3) {
-        sessionID = 1 << 29;
-        sessionID |= (buffer->usage & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
-        buffer->usage &= ~GRALLOC_USAGE_PRIVATE_3;
-        buffer->usage &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
-    }
-
     // Make sure the crop rectangle is entirely inside the buffer.
     Rect crop;
     mCrop.intersect(Rect(buffer->width, buffer->height), &crop);
@@ -292,7 +283,7 @@ int Surface::queueBuffer(android_native_buffer_t* buffer, int fenceFd) {
     sp<Fence> fence(fenceFd >= 0 ? new Fence(fenceFd) : Fence::NO_FENCE);
     IGraphicBufferProducer::QueueBufferOutput output;
     IGraphicBufferProducer::QueueBufferInput input(timestamp, isAutoTimestamp,
-            crop, mScalingMode | sessionID, mTransform, mSwapIntervalZero, fence);
+            crop, mScalingMode, mTransform, mSwapIntervalZero, fence);
     status_t err = mGraphicBufferProducer->queueBuffer(i, input, &output);
     if (err != OK)  {
         ALOGE("queueBuffer: error queuing buffer to SurfaceTexture, %d", err);

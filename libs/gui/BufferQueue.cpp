@@ -493,14 +493,6 @@ status_t BufferQueue::queueBuffer(int buf,
     input.deflate(&timestamp, &isAutoTimestamp, &crop, &scalingMode, &transform,
             &async, &fence);
 
-    uint32_t sessionId = 0;
-    if (scalingMode & (1 << 29)) {
-        sessionId = (1 << 29);
-        sessionId |= (scalingMode & GRALLOC_USAGE_MDS_SESSION_ID_MASK);
-        scalingMode &= ~(1 << 29);
-        scalingMode &= ~GRALLOC_USAGE_MDS_SESSION_ID_MASK;
-    }
-
     if (fence == NULL) {
         ST_LOGE("queueBuffer: fence is NULL");
         return BAD_VALUE;
@@ -585,7 +577,6 @@ status_t BufferQueue::queueBuffer(int buf,
         item.mBuf = buf;
         item.mFence = fence;
         item.mIsDroppable = mDequeueBufferCannotBlock || async;
-        item.mVideoSessionID = sessionId;
 
         if (mQueue.empty()) {
             // when the queue is empty, we can ignore "mDequeueBufferCannotBlock", and
