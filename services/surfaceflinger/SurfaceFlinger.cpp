@@ -1837,8 +1837,6 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
                             // guaranteed the FB is already cleared
                             layer->clearWithOpenGL(hw, clip);
                         }
-                        if ((cur->getHints() & HWC_HINT_DISABLE_ANIMATION))
-                            needDisableAnimation = true;
                         break;
                     }
                     case HWC_FRAMEBUFFER: {
