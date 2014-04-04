@@ -80,7 +80,7 @@ VirtualDisplaySurface::VirtualDisplaySurface(HWComposer& hwc, int32_t dispId,
         sink->query(NATIVE_WINDOW_FORMAT, &sinkFormat);
         mDefaultOutputFormat = sinkFormat;
     } else {
-        mDefaultOutputFormat = HAL_PIXEL_FORMAT_RGBA_8888;
+        mDefaultOutputFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     }
     mOutputFormat = mDefaultOutputFormat;
 
