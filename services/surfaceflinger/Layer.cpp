@@ -65,6 +65,7 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client,
         mDebug(false),
         mFormat(PIXEL_FORMAT_NONE),
         mOpaqueLayer(true),
+        mSwRenderingHack(false),
         mTransactionFlags(0),
         mQueuedFrames(0),
         mCurrentTransform(0),
@@ -110,6 +111,13 @@ Layer::Layer(SurfaceFlinger* flinger, const sp<Client>& client,
     nsecs_t displayPeriod =
             flinger->getHwComposer().getRefreshPeriod(HWC_DISPLAY_PRIMARY);
     mFrameTracker.setDisplayRefreshPeriod(displayPeriod);
+
+    // REVERT ME // ugly CHT hack ...
+    char  prop[PROPERTY_VALUE_MAX];
+    if (property_get("ro.kernel.qemu", prop, NULL))
+    {
+        mSwRenderingHack = true;
+    }
 }
 
 void Layer::onFirstRef() {
@@ -666,7 +674,7 @@ bool Layer::isOpaque() const
 
     // if the layer has the opaque flag, then we're always opaque,
     // otherwise we use the current buffer's format.
-    return mOpaqueLayer || mCurrentOpacity;
+    return mOpaqueLayer || mCurrentOpacity || mSwRenderingHack;
 }
 
 bool Layer::isProtected() const
