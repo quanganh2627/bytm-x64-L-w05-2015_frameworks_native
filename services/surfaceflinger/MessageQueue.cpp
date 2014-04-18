@@ -160,6 +160,10 @@ void MessageQueue::invalidateTransactionNow() {
 
 void MessageQueue::invalidate() {
 #if INVALIDATE_ON_VSYNC
+    if (mEvents == NULL) {
+        ALOGW("WARNING: EventThread not started, ignoring invalidate");
+        return;
+    }
     mEvents->requestNextVsync();
 #else
     mHandler->dispatchInvalidate();
@@ -170,6 +174,10 @@ void MessageQueue::refresh() {
 #if INVALIDATE_ON_VSYNC
     mHandler->dispatchRefresh();
 #else
+    if (mEvents == NULL) {
+        ALOGW("WARNING: EventThread not started, ignoring refresh");
+        return;
+    }
     mEvents->requestNextVsync();
 #endif
 }
