@@ -1764,7 +1764,11 @@ void SurfaceFlinger::doComposeSurfaces(const sp<const DisplayDevice>& hw, const 
 
         // Never touch the framebuffer if we don't have any framebuffer layers
         const bool hasHwcComposition = hwc.hasHwcComposition(id);
-        if (hasHwcComposition) {
+        bool hasSkippedLayerList = false;
+#ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
+        hasSkippedLayerList = mPauseStrategy->skipBuildLayerList(hw->getDisplayType());
+#endif
+        if (hasHwcComposition || hasSkippedLayerList) {
             // when using overlays, we assume a fully transparent framebuffer
             // NOTE: we could reduce how much we need to clear, for instance
             // remove where there are opaque FB layers. however, on some
