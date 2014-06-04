@@ -45,6 +45,12 @@ static struct {
     { AID_RADIO, "isms" },
     { AID_RADIO, "iphonesubinfo" },
     { AID_RADIO, "simphonebook" },
+/* for Dual SIM */
+    { AID_RADIO, "phone2" },
+    { AID_RADIO, "isms2" },
+    { AID_RADIO, "iphonesubinfo2" },
+    { AID_RADIO, "simphonebook2" },
+    { AID_RADIO, "oemtelephony" },
     { AID_MEDIA, "common_time.clock" },
     { AID_MEDIA, "common_time.config" },
     { AID_KEYSTORE, "android.security.keystore" },
