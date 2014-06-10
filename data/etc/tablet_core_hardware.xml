@@ -68,4 +68,6 @@
          android.hardware.sensor.gyroscope.xml -->
     <!-- GSM phones must also include android.hardware.telephony.gsm.xml -->
     <!-- CDMA phones must also include android.hardware.telephony.cdma.xml -->
+    <feature name="com.intel.feat.permlic" />
+
 </permissions>

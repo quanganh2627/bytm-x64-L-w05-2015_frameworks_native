@@ -79,4 +79,5 @@
     <!-- Devices that have low-latency audio stacks suitable for apps like
          VoIP may include android.hardware.audio.low_latency.xml. ONLY apps
          that meet the requirements specified in the CDD may include this. -->
+    <feature name="com.intel.feat.permlic" />
 </permissions>
