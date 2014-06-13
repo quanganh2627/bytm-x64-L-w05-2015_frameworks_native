@@ -292,7 +292,7 @@ status_t VirtualDisplaySurface::dequeueBuffer(Source source,
         }
     }
     if (result & BUFFER_NEEDS_REALLOCATION) {
-        mSource[source]->requestBuffer(*sslot, &mProducerBuffers[pslot]);
+        result = mSource[source]->requestBuffer(*sslot, &mProducerBuffers[pslot]);
         VDS_LOGV("dequeueBuffer(%s): buffers[%d]=%p fmt=%d usage=%#x",
                 dbgSourceStr(source), pslot, mProducerBuffers[pslot].get(),
                 mProducerBuffers[pslot]->getPixelFormat(),
