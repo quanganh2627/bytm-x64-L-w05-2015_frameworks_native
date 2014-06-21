@@ -133,10 +133,10 @@ status_t SensorFusion::batch(void* ident, int handle, int flags, int64_t samplin
 }
 
 status_t SensorFusion::setDelay(void* ident, int64_t ns) {
-    mSensorDevice.setDelay(ident, mAcc.getHandle(), ns);
-    mSensorDevice.setDelay(ident, mMag.getHandle(), ms2ns(20));
-    mSensorDevice.setDelay(ident, mGyro.getHandle(), mTargetDelayNs);
-
+    // Call batch with timeout zero instead of setDelay().
+    mSensorDevice.batch(ident, mAcc.getHandle(), 0, ns, 0);
+    mSensorDevice.batch(ident, mMag.getHandle(), 0, ms2ns(20), 0);
+    mSensorDevice.batch(ident, mGyro.getHandle(), 0, mTargetDelayNs, 0);
     return NO_ERROR;
 }
 
