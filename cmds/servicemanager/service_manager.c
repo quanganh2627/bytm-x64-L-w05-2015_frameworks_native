@@ -54,6 +54,8 @@ static struct {
     { AID_MEDIA, "common_time.clock" },
     { AID_MEDIA, "common_time.config" },
     { AID_KEYSTORE, "android.security.keystore" },
+/* for FM Radio*/
+    { AID_AUDIO, "fmradioservice" },
 };
 
 void *svcmgr_handle;
