@@ -173,6 +173,15 @@ private:
         uint32_t width, height;
         String8 displayName;
         bool isSecure;
+        // customization for HDMI scaling setting
+        union {
+            uint32_t scale;
+            struct {
+                uint16_t scaleMode;
+                uint8_t  scaleStepX;
+                uint8_t  scaleStepY;
+            };
+        };
     };
 
     struct State {
@@ -396,6 +405,13 @@ private:
      void disableHardwareVsync(bool makeUnavailable);
      void resyncToHardwareVsync(bool makeAvailable);
 
+    // Intel feature : HDMI setting
+
+    int setDisplayScaling(uint32_t scale);
+    // handleDisplayScaling: calculate and modify the scaled frame rect.
+    void handleDisplayScaling(const DisplayDeviceState& state,
+            Rect& viewport, Rect& frame);
+
     /* ------------------------------------------------------------------------
      * Debugging & dumpsys
      */
@@ -485,6 +501,9 @@ private:
 
     Daltonizer mDaltonizer;
     bool mDaltonize;
+
+    // Intel HDMI setting feature
+    uint32_t mDisplayScaleState;
 
     mat4 mColorMatrix;
     bool mHasColorMatrix;
