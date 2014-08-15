@@ -148,6 +148,7 @@ SurfaceFlinger::SurfaceFlinger()
         mPrimaryHWVsyncEnabled(false),
         mHWVsyncAvailable(false),
         mDaltonize(false),
+        mDisplayScaleState(0),
         mHasColorMatrix(false)
 {
     ALOGI("SurfaceFlinger is starting");
@@ -1296,10 +1297,14 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         }
                         if ((state.orientation != draw[i].orientation)
                                 || (state.viewport != draw[i].viewport)
-                                || (state.frame != draw[i].frame))
-                        {
+                                || (state.frame != draw[i].frame)
+                                || (state.scale != draw[i].scale)) {
+                            Rect frame = state.frame;
+                            Rect viewport = state.viewport;
+                            // this will modify viewport and frame parameters
+                            handleDisplayScaling(state, viewport, frame);
                             disp->setProjection(state.orientation,
-                                    state.viewport, state.frame);
+                                    viewport, frame);
                         }
                         if (state.width != draw[i].width || state.height != draw[i].height) {
                             disp->setDisplaySize(state.width, state.height);
@@ -2830,6 +2835,20 @@ status_t SurfaceFlinger::onTransact(
                 mPrimaryDispSync.setRefreshSkipCount(n);
                 return NO_ERROR;
             }
+            /***************************************
+             *  intel customization start below
+             **************************************/
+
+            enum {eIntelHDMISetting = 2001};
+            case eIntelHDMISetting: {
+                n = data.readInt32();
+                ALOGD("setting HDMI scaling %d ", n);
+                int32_t result = setDisplayScaling((uint32_t)n);
+                n = data.readInt32();
+                reply->writeInt32(result);
+                return NO_ERROR;
+            }
+
         }
     }
     return err;
@@ -3327,12 +3346,134 @@ SurfaceFlinger::DisplayDeviceState::DisplayDeviceState()
 }
 
 SurfaceFlinger::DisplayDeviceState::DisplayDeviceState(DisplayDevice::DisplayType type)
-    : type(type), layerStack(DisplayDevice::NO_LAYER_STACK), orientation(0), width(0), height(0) {
+    : type(type), layerStack(DisplayDevice::NO_LAYER_STACK), orientation(0), width(0), height(0), scale(0) {
     viewport.makeInvalid();
     frame.makeInvalid();
 }
 
 // ---------------------------------------------------------------------------
+
+// ----------------------------------------------
+// Put Intel Customize stuff here
+
+int SurfaceFlinger::setDisplayScaling(uint32_t scale)
+{
+    Mutex::Autolock _l(mStateLock);
+    int32_t result = NO_ERROR;
+    sp<IBinder> token =
+            getBuiltInDisplay(DisplayDevice::DISPLAY_EXTERNAL);
+    ssize_t dpyIdx = mCurrentState.displays.indexOfKey(token);
+    if (dpyIdx < 0)
+        return BAD_VALUE;
+
+    DisplayDeviceState& disp(mCurrentState.displays.editValueAt(dpyIdx));
+    if (disp.isValid()) {
+        if (disp.scale != scale) {
+            mDisplayScaleState = scale;
+            disp.scale = mDisplayScaleState;
+            setTransactionFlags(eDisplayTransactionNeeded);
+        }
+    } else {
+        result = INVALID_OPERATION;
+    }
+    return result;
+}
+
+
+enum {
+    eDisplayScaleNone            = 0,
+    eDisplayScaleFullscreen      = 1,
+    eDisplayScaleCenter          = 2,
+    eDisplayScaleAspect          = 3
+};
+
+
+void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
+        Rect& viewport, Rect& frame)
+{
+    ALOGD("handleDisplayScaling");
+    if (state.type == DisplayDevice::DISPLAY_EXTERNAL) {
+        uint32_t width;
+        uint32_t height;
+        HWComposer& hwc(getHwComposer());
+
+        if (!hwc.isConnected(state.type))
+            return;
+
+        width = hwc.getWidth(state.type);
+        height = hwc.getHeight(state.type);
+
+        switch (state.scaleMode) {
+        case eDisplayScaleFullscreen:
+            frame.left = frame.top = 0;
+            frame.right = width;
+            frame.bottom = height;
+            break;
+        case eDisplayScaleCenter:
+        {
+            uint32_t viewWidth;
+            uint32_t viewHeight;
+            bool isRot90_270;
+
+            isRot90_270 = (state.orientation == DisplayState::eOrientation90 ||
+                    state.orientation == DisplayState::eOrientation270);
+            if (isRot90_270) {
+                viewWidth = viewport.bottom - viewport.top;
+                viewHeight = viewport.right - viewport.left;
+            } else {
+                viewWidth = viewport.right - viewport.left;
+                viewHeight = viewport.bottom - viewport.top;
+            }
+
+            if (width < viewWidth) {
+                frame.left = 0;
+                frame.right = width;
+                if (isRot90_270) {
+                    viewport.top = 0;
+                    viewport.bottom = width;
+                } else {
+                    viewport.left = 0;
+                    viewport.right = width;
+                }
+            } else {
+                frame.left = (width - viewWidth) / 2;
+                frame.right = (width + viewWidth) / 2;
+            }
+
+            if (height < viewHeight) {
+                frame.top = 0;
+                frame.bottom = height;
+                if (isRot90_270) {
+                    viewport.left = 0;
+                    viewport.right = height;
+                } else {
+                    viewport.top = 0;
+                    viewport.bottom = height;
+                }
+            } else {
+                frame.top = (height - viewHeight) / 2;
+                frame.bottom = (height + viewHeight) / 2;
+            }
+            break;
+        }
+        case eDisplayScaleAspect:
+        case eDisplayScaleNone:
+        default:
+            break;
+        }
+
+        if (state.scaleStepX) {
+            int frameWidth = frame.right - frame.left;
+            frame.left += state.scaleStepX * frameWidth / 100;
+            frame.right -= state.scaleStepX * frameWidth / 100;
+        }
+        if (state.scaleStepY) {
+            int frameHeight = frame.bottom - frame.left;
+            frame.top += state.scaleStepY * frameHeight / 100;
+            frame.bottom -= state.scaleStepY * frameHeight / 100;
+        }
+    }
+}
 
 }; // namespace android
 
