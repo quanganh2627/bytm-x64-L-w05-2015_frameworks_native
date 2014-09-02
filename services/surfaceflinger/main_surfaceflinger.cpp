@@ -24,6 +24,9 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include "SurfaceFlinger.h"
+#ifdef TARGET_HAS_MULTIPLE_DISPLAY
+#include <display/MultiDisplayService.h>
+#endif
 
 using namespace android;
 
@@ -35,6 +38,11 @@ int main(int, char**) {
     // start the thread pool
     sp<ProcessState> ps(ProcessState::self());
     ps->startThreadPool();
+
+#ifdef TARGET_HAS_MULTIPLE_DISPLAY
+    // instantiate Intel multidisplay service
+    intel::MultiDisplayService::instantiate();
+#endif
 
     // instantiate surfaceflinger
     sp<SurfaceFlinger> flinger = new SurfaceFlinger();
