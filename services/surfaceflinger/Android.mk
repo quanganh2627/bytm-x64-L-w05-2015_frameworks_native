@@ -120,6 +120,11 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libutils
 
+ifeq ($(TARGET_HAS_MULTIPLE_DISPLAY),true)
+    LOCAL_SHARED_LIBRARIES += libmultidisplay
+    LOCAL_CFLAGS += -DTARGET_HAS_MULTIPLE_DISPLAY
+endif
+
 LOCAL_MODULE:= surfaceflinger
 
 ifdef TARGET_32_BIT_SURFACEFLINGER
