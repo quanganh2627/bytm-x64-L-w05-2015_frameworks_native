@@ -688,7 +688,7 @@ static void run_patchoat(int input_fd, int oat_fd, const char* input_file_name,
 
 static void run_dex2oat(int zip_fd, int oat_fd, const char* input_file_name,
     const char* output_file_name, const char *pkgname, const char *instruction_set,
-    bool vm_safe_mode)
+    bool vm_safe_mode, const char *input_compiler_filter_str)
 {
     static const unsigned int MAX_INSTRUCTION_SET_LEN = 7;
 
@@ -785,6 +785,34 @@ static void run_dex2oat(int zip_fd, int oat_fd, const char* input_file_name,
         have_dex2oat_compiler_filter_flag = true;
     } else if (have_dex2oat_compiler_filter_flag) {
         sprintf(dex2oat_compiler_filter_arg, "--compiler-filter=%s", dex2oat_compiler_filter_flag);
+    } else {
+        /*
+         * If we fall through to this logic, the compiler filter flag PackageManager will be used.
+         *
+         * The cases when we don't fall through to this else are:
+         * 1) dalvik.vm.dex2oat-filter property is set.
+         * OR
+         * 2) dalvik.vm.dex2oat-flags property contains compiler filter.
+         * OR
+         * 3) Skip compilation is true.
+         */
+
+        // Check compiler filter is passed in any other way.
+        if (!have_dex2oat_flags || (strstr(dex2oat_flags, "--compiler_filter") == NULL)) {
+            if (input_compiler_filter_str) {
+                int input_compiler_filter_str_len = strlen(input_compiler_filter_str);
+                if (input_compiler_filter_str_len > PROPERTY_VALUE_MAX) {
+                    ALOGI("dex2oat flag from PackageManager longer than max length of %d\n",
+                          PROPERTY_VALUE_MAX);
+                } else if (input_compiler_filter_str_len != 0) {
+                    sprintf(dex2oat_compiler_filter_arg, "--compiler-filter=%s",
+                          input_compiler_filter_str);
+                    have_dex2oat_compiler_filter_flag = true;
+                    ALOGI("Running dex2oat with flag from PackageManager: %s\n",
+                          input_compiler_filter_str);
+                }
+            }
+        }
     }
 
     ALOGV("Running %s in=%s out=%s\n", DEX2OAT_BIN, input_file_name, output_file_name);
@@ -862,7 +890,7 @@ static int wait_child(pid_t pid)
 
 int dexopt(const char *apk_path, uid_t uid, bool is_public,
            const char *pkgname, const char *instruction_set,
-           bool vm_safe_mode, bool is_patchoat)
+           bool vm_safe_mode, bool is_patchoat, const char *dex_opt_flag)
 {
     struct utimbuf ut;
     struct stat input_stat, dex_stat;
@@ -997,7 +1025,7 @@ int dexopt(const char *apk_path, uid_t uid, bool is_public,
                 run_patchoat(input_fd, out_fd, input_file, out_path, pkgname, instruction_set);
             } else {
                 run_dex2oat(input_fd, out_fd, input_file, out_path, pkgname, instruction_set,
-                            vm_safe_mode);
+                            vm_safe_mode, dex_opt_flag);
             }
         } else {
             exit(69);   /* Unexpected persist.sys.dalvik.vm.lib value */
