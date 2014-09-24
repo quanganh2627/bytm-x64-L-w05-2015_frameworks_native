@@ -24,7 +24,19 @@
 namespace android {
 
 class InputListenerInterface;
-
+// --- Event Processing ---
+typedef int (*EventProcessingInit)();
+typedef int (*EventProcessingFini)();
+typedef bool (*EventProcessing)(nsecs_t eventTime, int32_t deviceId,
+                                uint32_t source, uint32_t policyFlags,
+                                int32_t action, int32_t flags,
+                                int32_t metaState, int32_t buttonState,
+                                int32_t edgeFlags, int32_t displayId,
+                                uint32_t pointerCount,
+                                PointerProperties* pointerProperties,
+                                PointerCoords* pointerCoords,
+                                float xPrecision, float yPrecision,
+                                nsecs_t downTime);
 
 /* Superclass of all input event argument objects */
 struct NotifyArgs {
@@ -187,6 +199,11 @@ public:
     void flush();
 
 private:
+    // Event processing.
+    void eventProcessingInitImpl();
+    void eventProcessingFiniImpl();
+    void* event_processing_handle;
+    EventProcessing event_processing;
     sp<InputListenerInterface> mInnerListener;
     Vector<NotifyArgs*> mArgsQueue;
 };
