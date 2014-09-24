@@ -28,6 +28,7 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libcrypto \
     libcutils \
+    libdl \
     libinput \
     liblog \
     libutils \
