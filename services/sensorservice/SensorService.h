@@ -45,14 +45,6 @@
 // For older HALs which don't support batching, use a smaller socket buffer size.
 #define SOCKET_BUFFER_SIZE_NON_BATCHED 4 * 1024
 
-// Flags for sensors_event_t.flag. Using only the most significant two bits for flags.
-// MSB is to invalidate a sensor_event (typically a flush_complete_event) so that
-// it won't be used by other connections.
-// MSB 2nd bit is used to indicate whether the event needs to be acknowledged or not.
-// This is typically used for WAKE_UP sensors. WAKE_UP_SENSOR_EVENT_NEEDS_ACK is defined
-// in SensorEveneQueue.h
-#define SENSOR_EVENT_INVALID_FLAG     (1U << 31)
-
 struct sensors_poll_device_t;
 struct sensors_module_t;
 
@@ -94,7 +86,7 @@ class SensorService :
         // Count the number of flush complete events which are about to be dropped in the buffer.
         // Increment mPendingFlushEventsToSend in mSensorInfo. These flush complete events will be
         // sent separately before the next batch of events.
-        void countFlushCompleteEventsLocked(sensors_event_t* scratch, int numEventsDropped);
+        void countFlushCompleteEventsLocked(sensors_event_t const* scratch, int numEventsDropped);
 
         // Check if there are any wake up events in the buffer. If yes, return the index of the
         // first wake_up sensor event in the buffer else return -1. This wake_up sensor event will
@@ -156,10 +148,12 @@ class SensorService :
     public:
         SensorEventConnection(const sp<SensorService>& service, uid_t uid);
 
-        status_t sendEvents(sensors_event_t* buffer, size_t count,
-                sensors_event_t* scratch);
+        status_t sendEvents(sensors_event_t const* buffer, size_t count,
+                sensors_event_t* scratch,
+                SensorEventConnection const * const * mapFlushEventsToConnections = NULL);
         bool hasSensor(int32_t handle) const;
         bool hasAnySensor() const;
+        bool hasOneShotSensors() const;
         bool addSensor(int32_t handle);
         bool removeSensor(int32_t handle);
         void setFirstFlushPending(int32_t handle, bool value);
@@ -196,7 +190,7 @@ class SensorService :
     bool isVirtualSensor(int handle) const;
     Sensor getSensorFromHandle(int handle) const;
     bool isWakeUpSensor(int type) const;
-    void recordLastValueLocked(const sensors_event_t* buffer, size_t count);
+    void recordLastValueLocked(sensors_event_t const* buffer, size_t count);
     static void sortEventBuffer(sensors_event_t* buffer, size_t count);
     Sensor registerSensor(SensorInterface* sensor);
     Sensor registerVirtualSensor(SensorInterface* sensor);
@@ -237,6 +231,9 @@ class SensorService :
     DefaultKeyedVector<int, SensorInterface*> mActiveVirtualSensors;
     SortedVector< wp<SensorEventConnection> > mActiveConnections;
     bool mWakeLockAcquired;
+    sensors_event_t *mSensorEventBuffer, *mSensorEventScratch;
+    SensorEventConnection const **mMapFlushEventsToConnections;
+
     // The size of this vector is constant, only the items are mutable
     KeyedVector<int32_t, sensors_event_t> mLastEventSeen;
 
