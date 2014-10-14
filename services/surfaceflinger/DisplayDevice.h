@@ -159,6 +159,7 @@ public:
      */
     uint32_t getPageFlipCount() const;
     void dump(String8& result) const;
+    sp<ANativeWindow> mNativeWindow;
 
 private:
     /*
@@ -170,7 +171,6 @@ private:
     wp<IBinder> mDisplayToken;
 
     // ANativeWindow this display is rendering into
-    sp<ANativeWindow> mNativeWindow;
     sp<DisplaySurface> mDisplaySurface;
 
     EGLDisplay      mDisplay;
