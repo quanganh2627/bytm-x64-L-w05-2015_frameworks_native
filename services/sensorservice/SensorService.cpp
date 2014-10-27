@@ -189,14 +189,14 @@ void SensorService::onFirstRef()
             }
 
             mWakeLockAcquired = false;
-            run("SensorService", PRIORITY_URGENT_DISPLAY);
             mLooper = new Looper(false);
-
             const size_t minBufferSize = SensorEventQueue::MAX_RECEIVE_BUFFER_EVENT_COUNT;
             mSensorEventBuffer = new sensors_event_t[minBufferSize];
             mSensorEventScratch = new sensors_event_t[minBufferSize];
             mMapFlushEventsToConnections = new SensorEventConnection const * [minBufferSize];
+
             mInitCheck = NO_ERROR;
+            run("SensorService", PRIORITY_URGENT_DISPLAY);
         }
     }
 }
@@ -247,9 +247,10 @@ status_t SensorService::dump(int fd, const Vector<String16>& /*args*/)
             const Sensor& s(mSensorList[i]);
             const sensors_event_t& e(mLastEventSeen.valueFor(s.getHandle()));
             result.appendFormat(
-                    "%-15s| %-10s| %-20s| 0x%08x | \"%s\" | type=%d |",
+                    "%-15s| %-10s| version=%d |%-20s| 0x%08x | \"%s\" | type=%d |",
                     s.getName().string(),
                     s.getVendor().string(),
+                    s.getVersion(),
                     s.getStringType().string(),
                     s.getHandle(),
                     s.getRequiredPermission().string(),
