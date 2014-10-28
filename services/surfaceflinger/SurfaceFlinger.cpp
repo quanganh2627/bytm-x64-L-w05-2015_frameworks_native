@@ -1075,6 +1075,7 @@ void SurfaceFlinger::setUpHWComposer() {
                     if (hwc.createWorkList(id, count) == NO_ERROR) {
                         HWComposer::LayerListIterator cur = hwc.begin(id);
                         const HWComposer::LayerListIterator end = hwc.end(id);
+                        bool needForceSkipHwc = false;
                         for (size_t i=0 ; cur!=end && i<count ; ++i, ++cur) {
                             const sp<Layer>& layer(currentLayers[i]);
                             layer->setGeometry(hw, *cur);
@@ -1082,6 +1083,16 @@ void SurfaceFlinger::setUpHWComposer() {
 #ifdef INTEL_FEATURE_DISABLE_ROATAION_ANIMA_ON_HDMI
                             forceSkip = mPauseStrategy->forceHwcSkip(hw->getDisplayType());
 #endif
+							ALOGE("wueching:setSkip:%d,%d,%d,%d,%d",count,forceSkip,mDebugDisableHWC,mDebugRegion,mDaltonize);
+                            String8 strSurfaceView("SurfaceView");
+                            if (hw->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY &&
+                                layer->getName().compare(strSurfaceView) == 0){
+                                needForceSkipHwc = true;
+                            }
+
+                            if (needForceSkipHwc) {
+                                forceSkip = true;
+                            }
                             if (forceSkip || mDebugDisableHWC || mDebugRegion || mDaltonize) {
                                 cur->setSkip(true);
                             }
