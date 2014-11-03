@@ -1093,6 +1093,16 @@ void SurfaceFlinger::setUpHWComposer() {
                             if (needForceSkipHwc) {
                                 forceSkip = true;
                             }
+							ALOGE("wueching:setUpHWComposer:getDisplayType=%d",hw->getDisplayType());
+							if(hw->getDisplayType()==DisplayDevice::DISPLAY_EXTERNAL)
+							{
+								ALOGE("wueching:setUpHWComposer:getCompositionType=%d",cur->getCompositionType());
+								if(cur->getCompositionType() == HWC_FRAMEBUFFER)
+								{
+									forceSkip = true;
+									ALOGE("wueching:setUpHWComposer:dpy=%d",dpy);
+								}
+							}
                             if (forceSkip || mDebugDisableHWC || mDebugRegion || mDaltonize) {
                                 cur->setSkip(true);
                             }
