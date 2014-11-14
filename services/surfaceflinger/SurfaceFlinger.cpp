@@ -2932,7 +2932,7 @@ void SurfaceFlinger::renderScreenImplLocked(
     // get screen geometry
     const uint32_t hw_w = hw->getWidth();
     const uint32_t hw_h = hw->getHeight();
-    const bool filtering = reqWidth != hw_w || reqWidth != hw_h;
+    const bool filtering = reqWidth != hw_w || reqHeight != hw_h;
 
     // make sure to clear all GL error flags
     engine.checkErrors();
