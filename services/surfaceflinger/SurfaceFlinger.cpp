@@ -998,6 +998,9 @@ void SurfaceFlinger::rebuildLayerStacks() {
             hw->dirtyRegion.orSelf(dirtyRegion);
         }
     }
+    else {
+        hideBackgroundOfGoogleGallery();
+    }
 }
 
 void SurfaceFlinger::setUpHWComposer() {
@@ -3472,7 +3475,53 @@ void SurfaceFlinger::handleDisplayScaling(const DisplayDeviceState& state,
         }
     }
 }
+void SurfaceFlinger::hideBackgroundOfGoogleGallery()
+{
+    bool  bGoogleGallery = false;
+    bool  bNavigationBar = false;
+    bool  hasNavigationBar = false;
+    bool  indexofGoogleGallery = 0;
+    String8 strNavigationBar("NavigationBar");
+    String8 strGoogleGallery("com.google.android.apps.plus/com.google.android.apps.plus.phone.VideoViewActivity");
 
+    const LayerVector& layers(mDrawingState.layersSortedByZ);
+    const sp<DisplayDevice>& hw(mDisplays[0]);
+    Vector< sp<Layer> > layersSortedByZ;
+    const int32_t id = hw->getHwcDisplayId();
+
+    if (mDisplays.size() != 1)
+        return;
+
+    for (size_t i=0 ; i<layers.size() ; i++) {
+        const sp<Layer>& layer(layers[i]);
+        if (layer->getName().compare(strNavigationBar) == 0)
+            hasNavigationBar = true;
+    }
+
+    if (!hasNavigationBar)
+        return;
+
+    const Vector< sp<Layer> >& currentLayers(hw->getVisibleLayersSortedByZ());
+    for (size_t i=0 ; i<currentLayers.size() ; i++) {
+        const sp<Layer>& layer(currentLayers[i]);
+        layersSortedByZ.add(layer);
+        if (layer->getName().compare(strGoogleGallery) == 0){
+            bGoogleGallery = true;
+            indexofGoogleGallery = i;
+        }
+        if (layer->getName().compare(strNavigationBar) == 0){
+            bNavigationBar = true;
+        }
+    }
+
+    if (!bNavigationBar){
+        if (bGoogleGallery){
+            invalidateHwcGeometry();
+            layersSortedByZ.removeAt(indexofGoogleGallery);
+            hw->setVisibleLayersSortedByZ(layersSortedByZ);
+        }
+    }
+}
 }; // namespace android
 
 

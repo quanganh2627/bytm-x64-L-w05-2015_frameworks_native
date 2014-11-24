@@ -394,6 +394,9 @@ private:
     void postFramebuffer();
     void drawWormhole(const sp<const DisplayDevice>& hw, const Region& region) const;
 
+    // Hide this layer when there is not any UI update,
+    // which helps to save power when playing video in full screen mode
+    void hideBackgroundOfGoogleGallery();
     /* ------------------------------------------------------------------------
      * Display management
      */
