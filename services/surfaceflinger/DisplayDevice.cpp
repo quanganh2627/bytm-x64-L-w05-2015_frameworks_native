@@ -401,7 +401,17 @@ void DisplayDevice::setProjection(int orientation,
     if (!frame.isValid()) {
         // the destination frame can be invalid if it has never been set,
         // in that case we assume the whole display frame.
-        frame = Rect(w, h);
+
+        // get ro.sf.hwrotation property and swap W, H if the angle is 90 or 270
+        int rotation = 0;
+        char value[PROPERTY_VALUE_MAX];
+        property_get("ro.sf.hwrotation", value, "0");
+        rotation = atoi(value);
+        if(rotation == DisplayState::eOrientation90 || rotation == DisplayState::eOrientation270) {
+            frame = Rect(h, w);
+        } else {
+		    frame = Rect(w, h);
+        }
     }
 
     if (viewport.isEmpty()) {

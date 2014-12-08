@@ -708,6 +708,10 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
         // TODO: this needs to go away (currently needed only by webkit)
         sp<const DisplayDevice> hw(getDefaultDisplayDevice());
         info->orientation = hw->getOrientation();
+        // get ro.sf.hwrotation property and check for 90 or 270 or use info->orientation
+        if(info->orientation == DisplayState::eOrientation90 || info->orientation == DisplayState::eOrientation270) {
+		    info->density = ydpi / 160.0f;
+        }
     } else {
         // TODO: where should this value come from?
         static const int TV_DENSITY = 213;
@@ -715,10 +719,16 @@ status_t SurfaceFlinger::getDisplayInfo(const sp<IBinder>& display, DisplayInfo*
         info->orientation = 0;
     }
 
+    // get ro.sf.hwrotation property and check for 90 or 270 or use info->orientation
+    if(info->orientation == DisplayState::eOrientation90 || info->orientation == DisplayState::eOrientation270) {
+        info->xdpi = ydpi;
+        info->ydpi = xdpi;
+    } else {
+        info->xdpi = xdpi;
+        info->ydpi = ydpi;
+    }
     info->w = hwc.getWidth(type);
     info->h = hwc.getHeight(type);
-    info->xdpi = xdpi;
-    info->ydpi = ydpi;
     info->fps = float(1e9 / hwc.getRefreshPeriod(type));
 
     // All non-virtual displays are currently considered secure.
@@ -2180,7 +2190,21 @@ void SurfaceFlinger::onInitializeDisplays() {
              DisplayState::eLayerStackChanged;
     d.token = mBuiltinDisplays[DisplayDevice::DISPLAY_PRIMARY];
     d.layerStack = 0;
-    d.orientation = DisplayState::eOrientationDefault;
+
+    int rotation = 0;
+    char value[PROPERTY_VALUE_MAX];
+    property_get("ro.sf.hwrotation", value, "");
+    rotation = atoi(value);
+    // get ro.sf.hwrotation property and set orientation
+    if(rotation == DisplayState::eOrientation90 )
+        d.orientation = DisplayState::eOrientation90;
+    else if( rotation == DisplayState::eOrientation270 )
+        d.orientation = DisplayState::eOrientation270;
+    else if( rotation == DisplayState::eOrientation180 )
+        d.orientation = DisplayState::eOrientation180;
+    else
+        d.orientation = DisplayState::eOrientationDefault;
+
     d.frame.makeInvalid();
     d.viewport.makeInvalid();
     displays.add(d);
