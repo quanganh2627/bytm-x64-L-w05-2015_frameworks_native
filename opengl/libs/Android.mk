@@ -40,6 +40,10 @@ LOCAL_SHARED_LIBRARIES += libdl
 # we need to access the private Bionic header <bionic_tls.h>
 LOCAL_C_INCLUDES += bionic/libc/private
 
+ifeq ($(USE_VIRTUAL_FRAME_BUF),true)
+LOCAL_CFLAGS  += -DVIRTUAL_FRAME_BUF
+endif
+
 LOCAL_CFLAGS += -DLOG_TAG=\"libEGL\"
 LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 LOCAL_CFLAGS += -fvisibility=hidden
