@@ -1362,6 +1362,9 @@ void SurfaceFlinger::handleTransactionLocked(uint32_t transactionFlags)
                         hw->setDisplayName(state.displayName);
                         mDisplays.add(display, hw);
                         if (state.isVirtualDisplay()) {
+                            ANativeWindow* window = hw->mNativeWindow.get();
+                            native_window_set_buffers_format(window, HAL_PIXEL_FORMAT_RGB_565);
+
                             if (hwcDisplayId >= 0) {
                                 mHwc->setVirtualDisplayProperties(hwcDisplayId,
                                         hw->getWidth(), hw->getHeight(),
