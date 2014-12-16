@@ -265,6 +265,10 @@ void *Loader::load_driver(const char* kind,
     public:
         static String8 find(const char* kind) {
             String8 result;
+#if defined(VIRTUAL_FRAME_BUF)
+		    ALOGE("No EGL Driver Found, use libGLES_android.so");
+     	    result.setTo("/system/lib/egl/libGLES_android.so");
+#else
             String8 pattern;
             pattern.appendFormat("lib%s", kind);
             const char* const searchPaths[] = {
@@ -298,6 +302,7 @@ void *Loader::load_driver(const char* kind,
 
             // we didn't find the driver. gah.
             result.clear();
+#endif			
             return result;
         }
 
