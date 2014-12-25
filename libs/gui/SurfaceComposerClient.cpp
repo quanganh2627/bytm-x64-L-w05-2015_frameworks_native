@@ -764,6 +764,10 @@ status_t ScreenshotClient::update(const sp<IBinder>& display, Rect sourceCrop,
 
 void ScreenshotClient::release() {
     if (mHaveBuffer) {
+	/*WA to fix RGX hardware CTS capturesceen fail*/
+	if (mBuffer.data) {
+		memset(mBuffer.data, 0, ScreenshotClient::getSize());
+	}
         mCpuConsumer->unlockBuffer(mBuffer);
         memset(&mBuffer, 0, sizeof(mBuffer));
         mHaveBuffer = false;
